@@ -10,13 +10,14 @@
   /* ... CSS dari index.html + tambahan buat chart & layout ... */
   #app{display:flex;flex-direction:column;gap:28px;align-items:stretch;}
   .panel{
-    background: linear-gradient(to right, var(--navy), #3b5bdb);  
+    background: linear-gradient(to right, var(--navy), #3b5bdb);
     color: white;
     border: none;
     padding: 32px 28px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius:18px;
   }
-  .panel h2, .panel h3, .panel p{color:white;}  
+  .panel h2, .panel h3, .panel p{color:white;}
   .panel p{opacity:0.8;}
   #timer{font-variant-numeric:tabular-nums;color:var(--red);font-size:20px;font-family:Cambria,serif;}
   @keyframes pulse{50%{opacity:0.5;}}
@@ -24,46 +25,46 @@
   #progress{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
   .box{
     background:white;
-    color: var(--ink);  
+    color: var(--gray-text);
     border:none;
     border-radius:14px;padding:20px 24px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   }
   .box h3{margin:0 0 8px; color:var(--navy);}
-  .box p{margin:0;color:var(--ink-soft);font-size:14px;}
+  .box p{margin:0;color:var(--gray-text);font-size:14px;}
   .box .val{font-family:Cambria,serif;font-size:24px;font-weight:600;color:var(--red);margin-top:12px;}
-  #soal{  
+  #soal{
     display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;
     background: white;
     border-radius: 8px;
     padding: 20px 24px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   }
   #soal>div{
     flex: 0 1 calc(50% - 6px);
-    padding: 16px 0;  
-    border-bottom: 1px solid var(--line);
+    padding: 16px 0;
+    border-bottom: 1px solid var(--gray-bg);
   }
-  #soal>div:nth-last-child(-n+2){border:none;}  
-  #soal h3{margin:0 0 4px;color:var(--ink);font-size:15px;font-weight:600;}
+  #soal>div:nth-last-child(-n+2){border:none;}
+  #soal h3{margin:0 0 4px;color:var(--gray-text);font-size:15px;font-weight:600;}
   .diff{display:flex;justify-content:space-around;}
   .diff>div{
     text-align:center;
     font-family:Cambria,serif;
-    font-size:18px;  
+    font-size:18px;
     font-weight:600;
-    background: #f1f5f9;
+    background: var(--gray-bg);
     padding: 8px 12px;
-    border-radius: 8px;  
-    color: #64748b;
+    border-radius: 8px;
+    color: var(--gray-text);
   }
   .pos{
     background: #bbf7d0 !important;
     color: #15803d !important;
   }
-  .neg{  
+  .neg{
     background: #fecaca !important;
-    color: #dc2626 !important;  
+    color: #dc2626 !important;
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
