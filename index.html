@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cek Pemahaman — Training Scrum Master</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --navy:#283990; --red:#E23633; --paper:#F6F5F2; --card:#FFFFFF;
+    --ink:#1C1E2B; --ink-soft:#5B5F76; --line:#DEDCE8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#14162A; --card:#1D2040; --ink:#EEEFF7; --ink-soft:#A9ADC7; --line:#33365C; }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    min-height:100vh; display:flex; justify-content:center; padding:32px 16px 60px;
+  }
+  h1,h2{font-family:Cambria,Georgia,serif; margin:0 0 6px; font-weight:700;}
+  .wrap{width:100%; max-width:560px;}
+  .top{display:flex; align-items:center; gap:12px; margin-bottom:22px;}
+  .mark{
+    width:40px;height:40px;border-radius:50%; background:var(--navy); flex:none;
+    display:flex;align-items:center;justify-content:center; color:#fff;
+    font-family:Cambria,serif; font-weight:700; font-size:18px;
+  }
+  .top small{color:var(--ink-soft); font-size:13px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px 26px;}
+  .badge{
+    display:inline-block; font-size:12.5px; color:var(--red); border:1px solid var(--red);
+    border-radius:999px; padding:3px 12px; margin-bottom:14px;
+  }
+  p{line-height:1.55; color:var(--ink-soft); font-size:15px;}
+  input[type=text]{
+    width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+    background:transparent; color:var(--ink); font-size:15px; margin-bottom:14px;
+  }
+  input[type=text]:focus{outline:2px solid var(--navy); border-color:var(--navy);}
+  .save-note{font-size:13.5px; color:var(--ink-soft); margin:6px 0 14px;}
+  .save-note.err{color:var(--red);}
+  .save-note.ok{color:#2E8B57;}
+  button.primary{
+    width:100%; padding:14px; border:none; border-radius:12px; background:var(--red);
+    color:#fff; font-size:16px; font-weight:700; cursor:pointer;
+  }
+  button.primary:disabled{opacity:.4; cursor:not-allowed;}
+  button.ghost{
+    background:transparent; border:1.5px solid var(--line); color:var(--ink);
+    border-radius:12px; padding:13px; font-size:15px; cursor:pointer;
+  }
+  .link-btn{background:none;border:none;color:var(--navy);text-decoration:underline;font-size:13.5px;cursor:pointer;padding:0;}
+  .progress-row{display:flex; justify-content:space-between; margin-bottom:10px;}
+  .progress-row span{font-size:13px; color:var(--ink-soft);}
+  .bar{height:6px; border-radius:99px; background:var(--line); overflow:hidden; margin-bottom:22px;}
+  .bar i{display:block; height:100%; background:var(--navy); border-radius:99px;}
+  .qtext{font-size:18px; line-height:1.45; margin-bottom:20px; font-family:Cambria,serif; font-weight:600;}
+  .opt{
+    display:block; width:100%; text-align:left; padding:13px 16px; margin-bottom:10px;
+    border-radius:12px; border:1.5px solid var(--line); background:transparent;
+    color:var(--ink); font-size:15px; cursor:pointer;
+  }
+  .opt.selected{border-color:var(--navy); background:rgba(40,57,144,.08);}
+  .nav-row{display:flex; justify-content:flex-end;}
+  .score-big{font-family:Cambria,serif; font-size:56px; font-weight:700; color:var(--navy); line-height:1; margin:6px 0 2px;}
+  table.recap{width:100%; border-collapse:collapse; font-size:13px; margin-top:14px;}
+  table.recap th,table.recap td{text-align:left; padding:7px 5px; border-bottom:1px solid var(--line);}
+  table.recap th{color:var(--ink-soft);}
+  .actions{display:flex; gap:10px; margin-top:20px;}
+  .actions button{flex:1;}
+  .explain{font-size:13.5px; color:var(--ink-soft); background:rgba(40,57,144,.06); border-radius:10px; padding:10px 12px; margin:6px 0 18px;}
+  .summary-grid{display:flex; gap:10px; margin:16px 0;}
+  .summary-box{flex:1; background:rgba(40,57,144,.06); border-radius:12px; padding:12px; text-align:center;}
+  .summary-box .n{font-family:Cambria,serif; font-size:22px; font-weight:700; color:var(--navy);}
+  .summary-box .l{font-size:12px; color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="mark">SM</div>
+    <div>
+      <div style="font-size:14px;font-weight:700;">Cek Pemahaman</div>
+      <small>Training Scrum Master — Efektif untuk Tim IT</small>
+    </div>
+  </div>
+  <div class="card" id="app">Memuat…</div>
+</div>
+
+<script>
+const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_DENGAN") === -1)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+const params = new URLSearchParams(window.location.search);
+const lockedModeParam = params.get("mode");
+const lockedMode = (lockedModeParam === "pre" || lockedModeParam === "post") ? lockedModeParam : null;
+
+const QUESTIONS = [
+  {cat:"Fondasi Agile", q:"Agile Manifesto lahir dari diskusi 17 praktisi software pada tahun berapa?",
+   opts:["1999","2001","2005","2010"], correct:1,
+   note:"Agile Manifesto disepakati tahun 2001 oleh 17 praktisi software."},
+  {cat:"Fondasi Agile", q:"Manakah pernyataan berikut yang justru BERTENTANGAN dengan nilai inti Agile Manifesto?",
+   opts:["Individu dan interaksi lebih diutamakan daripada proses dan tools",
+         "Working software lebih diutamakan daripada dokumentasi lengkap",
+         "Mengikuti rencana lebih diutamakan daripada merespons perubahan",
+         "Kolaborasi dengan pelanggan lebih diutamakan daripada negosiasi kontrak"], correct:2,
+   note:"Nilai aslinya justru sebaliknya: merespons perubahan lebih diutamakan daripada mengikuti rencana."},
+  {cat:"Mengenal Scrum", q:"Kenapa Scrum dianggap cocok untuk pengembangan software?",
+   opts:["Karena semua requirement bisa didefinisikan lengkap di awal",
+         "Karena kompleksitas & ketidakpastian teknis produk digital tinggi sehingga perlu iterasi",
+         "Karena tim boleh bekerja tanpa koordinasi",
+         "Karena tidak butuh feedback dari user"], correct:1,
+   note:"Scrum dirancang untuk menangani kompleksitas & ketidakpastian teknis lewat siklus iteratif."},
+  {cat:"Mengenal Scrum", q:"Ada berapa pilar (pillars) dalam Scrum?",
+   opts:["2","3","4","5"], correct:1,
+   note:"Tiga pilar Scrum: Transparency, Inspection, Adaptation."},
+  {cat:"Mengenal Scrum", q:"Berikut ini termasuk nilai (values) Scrum, KECUALI:",
+   opts:["Commitment","Courage","Focus","Efficiency"], correct:3,
+   note:"Lima nilai Scrum: Commitment, Courage, Focus, Openness, Respect — Efficiency bukan salah satunya."},
+  {cat:"Scrum Actors", q:"Siapa yang bertanggung jawab memaksimalkan nilai produk dan mengelola Product Backlog?",
+   opts:["Scrum Master","Product Owner","Developers","Stakeholder"], correct:1,
+   note:"Product Owner memegang akuntabilitas atas Product Backlog dan nilai produk."},
+  {cat:"Scrum Actors", q:"Apa peran utama Scrum Master dalam tim?",
+   opts:["Menulis kode aplikasi",
+         "Menjadi servant leader yang memastikan tim memahami & menjalankan Scrum dengan baik",
+         "Menentukan prioritas Product Backlog",
+         "Menyetujui anggaran proyek"], correct:1,
+   note:"Scrum Master adalah servant leader — memfasilitasi, bukan mengelola backlog atau menulis kode."},
+  {cat:"Scrum Events", q:"Event yang dilakukan setiap hari, maksimal 15 menit, untuk sinkronisasi progress tim disebut?",
+   opts:["Sprint Planning","Daily Scrum","Sprint Review","Sprint Retrospective"], correct:1,
+   note:"Daily Scrum adalah sesi sinkronisasi harian berdurasi maksimal 15 menit."},
+  {cat:"Scrum Events", q:"Pada event apa tim mendemonstrasikan increment (hasil kerja) kepada stakeholder?",
+   opts:["Sprint Planning","Daily Scrum","Sprint Review","Sprint Retrospective"], correct:2,
+   note:"Sprint Review adalah forum untuk mendemokan increment ke stakeholder dan mengumpulkan feedback."},
+  {cat:"Scrum Events", q:"Apa tujuan utama Sprint Retrospective?",
+   opts:["Menentukan Sprint Goal",
+         "Mendemo produk ke stakeholder",
+         "Mengevaluasi cara kerja tim & merencanakan perbaikan proses",
+         "Memecah Epic menjadi Task"], correct:2,
+   note:"Retrospective fokus pada refleksi proses kerja tim, bukan hasil produk."},
+  {cat:"Scrum Events", q:"Pada Sprint Planning, siapa yang menentukan BAGAIMANA (how) pekerjaan akan diselesaikan?",
+   opts:["Product Owner","Scrum Master","Developers","Stakeholder"], correct:2,
+   note:"Developers yang merancang pendekatan teknis untuk menyelesaikan pekerjaan di Sprint."},
+  {cat:"Waterfall & Scrum", q:"Pola \"Water-Scrum-Fall\" merujuk pada kondisi di mana?",
+   opts:["Organisasi menjalankan Scrum murni tanpa jejak waterfall sama sekali",
+         "Organisasi menerapkan Scrum di tengah proses, tapi tetap waterfall di tahap requirement awal & deployment/release akhir",
+         "Waterfall diubah total menjadi Scrum penuh",
+         "Scrum dijalankan tanpa konsep Sprint"], correct:1,
+   note:"Water-Scrum-Fall menggambarkan hybrid: Scrum hanya diterapkan di bagian tengah siklus proyek."},
+  {cat:"Bekal Praktik", q:"Dalam hierarki Product Backlog, hubungan yang benar adalah?",
+   opts:["Task berisi banyak Epic",
+         "Product Backlog berisi beberapa Epic, dan satu Epic dipecah menjadi beberapa Task",
+         "Epic dan Task adalah istilah yang sama persis",
+         "Sprint Goal adalah bagian dari sebuah Task"], correct:1,
+   note:"Alurnya: Product Backlog → berisi banyak Epic → satu Epic dipecah jadi beberapa Task."},
+  {cat:"Bekal Praktik", q:"Skala yang umum dipakai untuk Story Point saat Planning Poker adalah?",
+   opts:["Skala Fibonacci (1, 2, 3, 5, 8, ...)","Skala 1-100","Skala huruf A-F","Skala persentase"], correct:0,
+   note:"Skala Fibonacci dipakai karena selisih antar angka merepresentasikan ketidakpastian estimasi yang membesar."},
+  {cat:"Bekal Praktik", q:"Pada board retrospective ala EasyRetro, catatan di kolom \"To Improve\" dengan vote tertinggi biasanya diarahkan menjadi?",
+   opts:["Dihapus karena dianggap tidak penting",
+         "Action Item yang dibawa ke Sprint Backlog berikutnya dan dipantau lewat Daily Scrum",
+         "Epic baru yang langsung masuk Sprint Review",
+         "Sprint Goal untuk Sprint berikutnya"], correct:1,
+   note:"Catatan dengan vote tertinggi diarahkan jadi Action Item, lalu masuk Sprint Backlog dan dipantau via Daily Scrum."}
+];
+
+let mode = lockedMode || "pre";
+let nama = "", nik = "", divisi = "";
+let idx = 0;
+let answers = new Array(QUESTIONS.length).fill(null);
+const app = document.getElementById("app");
+
+function renderStart(){
+  if(!sb){
+    app.innerHTML = `<span class="badge">Setup belum selesai</span><h2>Konfigurasi Supabase belum diisi</h2><p>Isi SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js, lalu deploy ulang.</p>`;
+    return;
+  }
+  const toggleHtml = lockedMode
+    ? `<div class="save-note">Mode terkunci lewat link ini: <b>${lockedMode==="pre"?"Pretest":"Posttest"}</b></div>`
+    : `<div style="display:flex; gap:8px; margin:10px 0 16px;">
+        <button class="ghost" id="btnPre" style="flex:1;">Pretest</button>
+        <button class="ghost" id="btnPost" style="flex:1;">Posttest</button>
+      </div>`;
+  app.innerHTML = `
+    <span class="badge">${QUESTIONS.length} soal pilihan ganda</span>
+    <h2>Cek Pemahaman Scrum</h2>
+    <p>Isi data di bawah, lalu jawab ${QUESTIONS.length} soal. Hasil baru terlihat di akhir setelah semua soal dijawab.</p>
+    ${toggleHtml}
+    <input type="text" id="namaInput" placeholder="Nama *" value="${nama}">
+    <input type="text" id="nikInput" placeholder="NIK *" value="${nik}">
+    <input type="text" id="divisiInput" placeholder="Divisi / Posisi *" value="${divisi}">
+    <div class="save-note" id="startError" style="display:none;"></div>
+    <button class="primary" id="startBtn">Mulai ${mode==="pre"?"Pretest":"Posttest"}</button>
+    <div style="text-align:center; margin-top:10px;"><button class="link-btn" id="recapBtn">Lihat Rekap Semua Peserta</button></div>
+  `;
+  if(!lockedMode){
+    document.getElementById("btnPre").addEventListener("click", ()=>{ mode="pre"; document.getElementById("startBtn").textContent="Mulai Pretest"; });
+    document.getElementById("btnPost").addEventListener("click", ()=>{ mode="post"; document.getElementById("startBtn").textContent="Mulai Posttest"; });
+  }
+  document.getElementById("startBtn").addEventListener("click", handleStart);
+  document.getElementById("recapBtn").addEventListener("click", renderRecap);
+}
+
+async function handleStart(){
+  const errEl = document.getElementById("startError");
+  const namaVal = document.getElementById("namaInput").value.trim();
+  const nikVal = document.getElementById("nikInput").value.trim();
+  const divisiVal = document.getElementById("divisiInput").value.trim();
+  errEl.style.display = "none"; errEl.classList.remove("err");
+
+  if(!namaVal || !nikVal || !divisiVal){
+    errEl.textContent = "Nama, NIK, dan Divisi/Posisi wajib diisi.";
+    errEl.classList.add("err"); errEl.style.display = "block";
+    return;
+  }
+  nama = namaVal; nik = nikVal; divisi = divisiVal;
+
+  const btn = document.getElementById("startBtn");
+  btn.disabled = true; btn.textContent = "Memeriksa NIK…";
+  const { data, error } = await sb.from("results").select("id").eq("nik", nik).eq("mode", mode).limit(1);
+  btn.disabled = false; btn.textContent = "Mulai " + (mode==="pre"?"Pretest":"Posttest");
+
+  if(error){
+    errEl.textContent = "Gagal memeriksa NIK, coba lagi.";
+    errEl.classList.add("err"); errEl.style.display = "block";
+    return;
+  }
+  if(data && data.length > 0){
+    errEl.textContent = `NIK ${nik} sudah pernah mengisi ${mode==="pre"?"Pretest":"Posttest"} ini.`;
+    errEl.classList.add("err"); errEl.style.display = "block";
+    return;
+  }
+
+  idx = 0; answers = new Array(QUESTIONS.length).fill(null);
+  renderQuestion();
+}
+
+function renderQuestion(){
+  const q = QUESTIONS[idx];
+  const pct = Math.round((idx/QUESTIONS.length)*100);
+  app.innerHTML = `
+    <div class="progress-row"><span>${mode==="pre"?"Pretest":"Posttest"} — ${q.cat}</span><span>Soal ${idx+1} dari ${QUESTIONS.length}</span></div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="qtext">${q.q}</div>
+    <div id="opts"></div>
+    <div class="nav-row"><button class="primary" id="nextBtn" disabled>${idx===QUESTIONS.length-1?"Lihat Hasil":"Lanjut"}</button></div>
+  `;
+  const optsEl = document.getElementById("opts");
+  q.opts.forEach((text,i)=>{
+    const b = document.createElement("button");
+    b.className = "opt"; b.textContent = text;
+    b.addEventListener("click", ()=>{
+      answers[idx] = i;
+      document.querySelectorAll("#opts .opt").forEach((el,bi)=> el.classList.toggle("selected", bi===i));
+      document.getElementById("nextBtn").disabled = false;
+    });
+    optsEl.appendChild(b);
+  });
+  document.getElementById("nextBtn").addEventListener("click", ()=>{
+    if(idx < QUESTIONS.length-1){ idx++; renderQuestion(); } else { finishQuiz(); }
+  });
+}
+
+async function finishQuiz(){
+  const score = answers.reduce((acc,a,i)=> acc + (a===QUESTIONS[i].correct?1:0), 0);
+  app.innerHTML = `<span class="badge">Menyimpan…</span><h2>Menyimpan hasilmu</h2><p>Mohon tunggu sebentar.</p>`;
+
+  const { error } = await sb.from("results").insert({
+    nama, nik, divisi, mode, score, total: QUESTIONS.length
+  });
+
+  if(error){
+    const isDuplicate = error.code === "23505"; // unique_violation
+    renderResult(score, false, isDuplicate
+      ? `NIK ${nik} ternyata sudah tercatat untuk ${mode==="pre"?"Pretest":"Posttest"} ini (kemungkinan submit ganda). Hasil TIDAK disimpan ulang.`
+      : "Gagal menyimpan hasil, coba lagi nanti.");
+  } else {
+    renderResult(score, true);
+  }
+}
+
+function renderResult(score, saved, note){
+  const byCat = {};
+  QUESTIONS.forEach((q,i)=>{
+    byCat[q.cat] = byCat[q.cat] || {correct:0,total:0};
+    byCat[q.cat].total++;
+    if(answers[i]===q.correct) byCat[q.cat].correct++;
+  });
+  const catRows = Object.entries(byCat).map(([cat,v])=>
+    `<div style="display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px dashed var(--line);"><span>${cat}</span><span>${v.correct}/${v.total}</span></div>`
+  ).join("");
+
+  app.innerHTML = `
+    <span class="badge">${mode==="pre"?"Hasil Pretest":"Hasil Posttest"}</span>
+    <h2>${nama}, ini hasilmu</h2>
+    <div class="score-big">${score}/${QUESTIONS.length}</div>
+    <p>${Math.round(score/QUESTIONS.length*100)}% jawaban benar.</p>
+    <div>${catRows}</div>
+    <div class="save-note ${saved?'ok':'err'}">${saved ? "Hasil tersimpan." : (note||"")}</div>
+    <div class="actions">
+      <button class="ghost" id="reviewBtn">Tinjau Jawaban</button>
+      <button class="primary" id="restartBtn">Kembali ke Awal</button>
+    </div>
+  `;
+  document.getElementById("restartBtn").addEventListener("click", renderStart);
+  document.getElementById("reviewBtn").addEventListener("click", renderReview);
+}
+
+function renderReview(){
+  const rows = QUESTIONS.map((q,i)=>{
+    const ok = answers[i]===q.correct;
+    return `<div style="margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--ink-soft);margin-bottom:4px;">${q.cat} · Soal ${i+1}</div>
+      <div style="font-weight:600;margin-bottom:6px;">${q.q}</div>
+      <div style="font-size:14px;color:${ok?'#2E8B57':'var(--red)'};margin-bottom:4px;">
+        ${ok ? "Benar" : "Kurang tepat"} — jawabanmu: ${answers[i]===null?"(kosong)":q.opts[answers[i]]}
+      </div>
+      ${!ok ? `<div style="font-size:14px;margin-bottom:4px;">Jawaban benar: ${q.opts[q.correct]}</div>` : ""}
+      <div class="explain">${q.note}</div>
+    </div>`;
+  }).join("");
+  app.innerHTML = `<span class="badge">Tinjauan Jawaban</span><h2>Pembahasan</h2>${rows}<button class="primary" id="backBtn">Kembali ke Awal</button>`;
+  document.getElementById("backBtn").addEventListener("click", renderStart);
+}
+
+async function renderRecap(){
+  app.innerHTML = `<span class="badge">Rekap</span><h2>Memuat data…</h2>`;
+  const { data, error } = await sb.from("results").select("*").order("created_at", { ascending: false }).limit(1000);
+  if(error || !data){
+    app.innerHTML = `<span class="badge">Rekap</span><h2>Gagal memuat</h2><p>Coba lagi nanti.</p><button class="primary" id="backBtn2">Kembali</button>`;
+    document.getElementById("backBtn2").addEventListener("click", renderStart);
+    return;
+  }
+  const pre = data.filter(r=>r.mode==="pre");
+  const post = data.filter(r=>r.mode==="post");
+  const avg = list => list.length ? (list.reduce((a,r)=>a+r.score,0)/list.length).toFixed(1) : "-";
+  const tr = data.map(r=> `<tr><td>${r.nama}</td><td>${r.nik}</td><td>${r.divisi}</td><td>${r.mode==="pre"?"Pre":"Post"}</td><td>${r.score}/${r.total}</td></tr>`).join("");
+
+  app.innerHTML = `
+    <span class="badge">Rekap Peserta</span>
+    <h2>Rekap Hasil</h2>
+    <div class="summary-grid">
+      <div class="summary-box"><div class="n">${pre.length}</div><div class="l">Pengisi Pretest</div></div>
+      <div class="summary-box"><div class="n">${avg(pre)}</div><div class="l">Rata² Pretest</div></div>
+      <div class="summary-box"><div class="n">${post.length}</div><div class="l">Pengisi Posttest</div></div>
+      <div class="summary-box"><div class="n">${avg(post)}</div><div class="l">Rata² Posttest</div></div>
+    </div>
+    ${data.length ? `<div style="max-height:280px; overflow:auto;"><table class="recap"><thead><tr><th>Nama</th><th>NIK</th><th>Divisi</th><th>Mode</th><th>Skor</th></tr></thead><tbody>${tr}</tbody></table></div>` : `<p>Belum ada peserta yang mengisi.</p>`}
+    <div class="actions">
+      <button class="ghost" id="exportBtn">Export CSV</button>
+      <button class="primary" id="backBtn2">Kembali</button>
+    </div>
+  `;
+  document.getElementById("backBtn2").addEventListener("click", renderStart);
+  document.getElementById("exportBtn").addEventListener("click", ()=> exportCsv(data));
+}
+
+function csvEscape(v){
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+function exportCsv(rows){
+  const header = ["Nama","NIK","Divisi/Posisi","Mode","Skor","Total","Waktu"];
+  const lines = [header.join(",")];
+  rows.forEach(r=>{
+    lines.push([csvEscape(r.nama), csvEscape(r.nik), csvEscape(r.divisi), csvEscape(r.mode==="pre"?"Pretest":"Posttest"), csvEscape(r.score), csvEscape(r.total), csvEscape(r.created_at)].join(","));
+  });
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "rekap-pretest-posttest-scrum.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+renderStart();
+</script>
+</body>
+</html>
