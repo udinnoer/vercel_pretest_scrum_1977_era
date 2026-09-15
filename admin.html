@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rekap Peserta — Pretest/Posttest Training Scrum Master</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  /* ... CSS dari index.html ... */
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="mark">SM</div>
+    <div>
+      <div style="font-size:14px;font-weight:700;">Rekap Peserta <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kembali</a> <a href="dashboard.html" class="link-btn" style="margin-left:6px;font-size:12px;">Dashboard</a></div>
+      <small>Training Scrum Master — Tim IT</small>  
+    </div>
+  </div>
+  <div class="card" id="app">Memuat rekap peserta…</div>
+</div>
+
+<script>
+const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_DENGAN") === -1)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+const app = document.getElementById("app");
+
+async function renderRecap(){
+  app.innerHTML = `<span class="badge">Rekap Peserta</span><h2>Memuat data…</h2>`;
+  const { data: results } = await sb.from("results").select("*").order("created_at", { ascending: false }).limit(1000);
+  const { data: sessions } = await sb.from("sessions").select("*").order("started_at", { ascending: false }).limit(1000);
+
+  if(!results || !sessions){
+    app.innerHTML = `<span class="badge">Rekap Peserta</span><h2>Gagal memuat</h2><p>Coba muat ulang halaman ini.</p><p><a href="admin.html" class="link-btn">Muat Ulang</a></p>`;
+    return;
+  }
+
+  const pre = results.filter(r=>r.mode==="pre");
+  const post = results.filter(r=>r.mode==="post");
+  const avg = list => list.length ? (list.reduce((a,r)=>a+r.score,0)/list.length).toFixed(1) : "-";
+
+  const resultRows = results.map(r=>
+    `<tr>
+      <td>${r.nama}</td><td>${r.nik}</td><td>${r.divisi}</td><td>${r.mode==="pre"?"Pre":"Post"}</td>
+      <td>${r.score}/${r.total}</td><td>${r.created_at}</td>
+    </tr>`
+  ).join("");
+
+  const inProgress = sessions.filter(s => s.status === "in_progress");
+  const sessionRows = sessions.map(s=>
+    `<tr>
+      <td>${s.nama}</td><td>${s.nik}</td><td>${s.divisi}</td><td>${s.mode==="pre"?"Pre":"Post"}</td>
+      <td>${s.status==="in_progress"?"Sedang Mengerjakan":"Selesai"}</td><td>${s.started_at}</td>
+    </tr>`  
+  ).join("");
+
+  app.innerHTML = `
+    <span class="badge">Rekap Peserta</span>
+    <h2>Hasil Keseluruhan</h2>
+    <div class="summary-grid">
+      <div class="summary-box"><div class="n">${pre.length}</div><div class="l">Mengisi Pretest</div></div>
+      <div class="summary-box"><div class="n">${post.length}</div><div class="l">Mengisi Posttest</div></div>
+      <div class="summary-box"><div class="n">${avg(pre)}</div><div class="l">Rata² Pretest</div></div>
+      <div class="summary-box"><div class="n">${avg(post)}</div><div class="l">Rata² Posttest</div></div>
+    </div>
+
+    ${inProgress.length > 0 ? `
+    <h3 style="margin-top:24px;">Sedang Mengerjakan (${inProgress.length})</h3>
+    <table class="recap">
+      <thead><tr><th>Nama</th><th>NIK</th><th>Divisi</th><th>Mode</th><th>Status</th><th>Mulai</th></tr></thead>
+      <tbody>${sessionRows}</tbody>
+    </table>` : ""}
+
+    <h3 style="margin-top:${inProgress.length > 0 ? 16 : 24}px;">Hasil Lengkap (${results.length})</h3>
+    <table class="recap">
+      <thead><tr><th>Nama</th><th>NIK</th><th>Divisi</th><th>Mode</th><th>Skor</th><th>Waktu</th></tr></thead>
+      <tbody>${resultRows}</tbody>
+    </table>
+    <div class="actions">
+      <button class="ghost" id="exportBtn">Export CSV</button>
+    </div>
+  `;
+  document.getElementById("exportBtn").addEventListener("click", ()=> exportCsv(results));
+}
+
+function csvEscape(v){
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+function exportCsv(rows){
+  const header = ["Nama","NIK","Divisi/Posisi","Mode","Skor","Total","Jawaban","Waktu"];
+  const lines = [header.join(",")];
+  rows.forEach(r=>{
+    lines.push([csvEscape(r.nama), csvEscape(r.nik), csvEscape(r.divisi), csvEscape(r.mode==="pre"?"Pretest":"Posttest"),
+                csvEscape(r.score), csvEscape(r.total), csvEscape(r.answers), csvEscape(r.created_at)].join(","));
+  });
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `rekap-hasil-scrum-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+if(!sb){
+  app.innerHTML = `<span class="badge">Konfigurasi Tidak Ditemukan</span><h2>Tidak dapat terhubung ke database</h2><p>Periksa variabel SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js.</p>`;
+} else {
+  renderRecap();
+}
+</script>
+</body>
+</html>

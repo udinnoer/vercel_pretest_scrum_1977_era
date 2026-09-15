@@ -81,9 +81,9 @@
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="mark">SM</div>
+    <div class="mark">SM</div>  
     <div>
-      <div style="font-size:14px;font-weight:700;">Cek Pemahaman</div>
+      <div style="font-size:14px;font-weight:700;">Cek Pemahaman <a href="admin.html" class="link-btn" style="margin-left:10px;font-size:12px;">Rekap</a> <a href="dashboard.html" class="link-btn" style="margin-left:6px;font-size:12px;">Dashboard</a></div>
       <small>Training Scrum Master — Efektif untuk Tim IT</small>
     </div>
   </div>
@@ -91,13 +91,26 @@
 </div>
 
 <script>
-const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_DENGAN") === -1)
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : null;
+let sb = null;
+let initError = null;
+try {
+  if (typeof SUPABASE_URL === "undefined" || typeof SUPABASE_ANON_KEY === "undefined") {
+    throw new Error("config.js tidak termuat (variabel SUPABASE_URL/SUPABASE_ANON_KEY tidak ada). Pastikan file config.js ada di folder yang sama dengan index.html dan ikut ter-deploy.");
+  }
+  if (SUPABASE_URL.indexOf("GANTI_DENGAN") !== -1 || SUPABASE_ANON_KEY.indexOf("GANTI_DENGAN") !== -1) {
+    throw new Error("config.js masih berisi teks placeholder. Isi SUPABASE_URL dan SUPABASE_ANON_KEY dengan nilai asli dari dashboard Supabase.");
+  }
+  if (typeof window.supabase === "undefined" || !window.supabase.createClient) {
+    throw new Error("Library supabase-js gagal dimuat dari CDN (cdn.jsdelivr.net). Cek koneksi internet, pemblokir iklan, atau firewall jaringan yang mungkin memblokir domain itu.");
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  initError = e.message;
+  console.error("Supabase init error:", e);
+}
 
-const params = new URLSearchParams(window.location.search);
-const lockedModeParam = params.get("mode");
-const lockedMode = (lockedModeParam === "pre" || lockedModeParam === "post") ? lockedModeParam : null;
+let mode = "pre";
+let sessionId = null;
 
 const QUESTIONS = [
   {cat:"Fondasi Agile", q:"Agile Manifesto lahir dari diskusi 17 praktisi software pada tahun berapa?",
@@ -168,7 +181,6 @@ const QUESTIONS = [
    note:"Catatan dengan vote tertinggi diarahkan jadi Action Item, lalu masuk Sprint Backlog dan dipantau via Daily Scrum."}
 ];
 
-let mode = lockedMode || "pre";
 let nama = "", nik = "", divisi = "";
 let idx = 0;
 let answers = new Array(QUESTIONS.length).fill(null);
@@ -179,30 +191,17 @@ function renderStart(){
     app.innerHTML = `<span class="badge">Setup belum selesai</span><h2>Konfigurasi Supabase belum diisi</h2><p>Isi SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js, lalu deploy ulang.</p>`;
     return;
   }
-  const toggleHtml = lockedMode
-    ? `<div class="save-note">Mode terkunci lewat link ini: <b>${lockedMode==="pre"?"Pretest":"Posttest"}</b></div>`
-    : `<div style="display:flex; gap:8px; margin:10px 0 16px;">
-        <button class="ghost" id="btnPre" style="flex:1;">Pretest</button>
-        <button class="ghost" id="btnPost" style="flex:1;">Posttest</button>
-      </div>`;
   app.innerHTML = `
     <span class="badge">${QUESTIONS.length} soal pilihan ganda</span>
     <h2>Cek Pemahaman Scrum</h2>
-    <p>Isi data di bawah, lalu jawab ${QUESTIONS.length} soal. Hasil baru terlihat di akhir setelah semua soal dijawab.</p>
-    ${toggleHtml}
+    <p>Isi data di bawah untuk mulai. Sistem otomatis mengarahkan ke Pretest atau Posttest sesuai riwayatmu.</p>
     <input type="text" id="namaInput" placeholder="Nama *" value="${nama}">
     <input type="text" id="nikInput" placeholder="NIK *" value="${nik}">
     <input type="text" id="divisiInput" placeholder="Divisi / Posisi *" value="${divisi}">
     <div class="save-note" id="startError" style="display:none;"></div>
-    <button class="primary" id="startBtn">Mulai ${mode==="pre"?"Pretest":"Posttest"}</button>
-    <div style="text-align:center; margin-top:10px;"><button class="link-btn" id="recapBtn">Lihat Rekap Semua Peserta</button></div>
+    <button class="primary" id="startBtn">Mulai Pretest</button>
   `;
-  if(!lockedMode){
-    document.getElementById("btnPre").addEventListener("click", ()=>{ mode="pre"; document.getElementById("startBtn").textContent="Mulai Pretest"; });
-    document.getElementById("btnPost").addEventListener("click", ()=>{ mode="post"; document.getElementById("startBtn").textContent="Mulai Posttest"; });
-  }
   document.getElementById("startBtn").addEventListener("click", handleStart);
-  document.getElementById("recapBtn").addEventListener("click", renderRecap);
 }
 
 async function handleStart(){
@@ -220,21 +219,49 @@ async function handleStart(){
   nama = namaVal; nik = nikVal; divisi = divisiVal;
 
   const btn = document.getElementById("startBtn");
-  btn.disabled = true; btn.textContent = "Memeriksa NIK…";
-  const { data, error } = await sb.from("results").select("id").eq("nik", nik).eq("mode", mode).limit(1);
-  btn.disabled = false; btn.textContent = "Mulai " + (mode==="pre"?"Pretest":"Posttest");
+  btn.disabled = true; btn.textContent = "Memeriksa status…";
+
+  const { data, error } = await sb.from("results").select("mode").eq("nik", nik);
 
   if(error){
-    errEl.textContent = "Gagal memeriksa NIK, coba lagi.";
-    errEl.classList.add("err"); errEl.style.display = "block";
-    return;
-  }
-  if(data && data.length > 0){
-    errEl.textContent = `NIK ${nik} sudah pernah mengisi ${mode==="pre"?"Pretest":"Posttest"} ini.`;
+    btn.disabled = false; btn.textContent = "Mulai Pretest";
+    errEl.textContent = "Gagal memeriksa status, coba lagi.";
     errEl.classList.add("err"); errEl.style.display = "block";
     return;
   }
 
+  const doneModes = (data || []).map(r => r.mode);
+  const hasPre = doneModes.includes("pre");
+  const hasPost = doneModes.includes("post");
+
+  if(hasPre && hasPost){
+    app.innerHTML = `
+      <span class="badge">Sudah Selesai</span>
+      <h2>${nama}, kamu sudah menyelesaikan keduanya</h2>
+      <p>Pretest dan Posttest untuk NIK ${nik} sudah tercatat. Tidak perlu mengisi lagi. Terima kasih!</p>
+      <button class="primary" id="backBtn0">Kembali</button>
+    `;
+    document.getElementById("backBtn0").addEventListener("click", renderStart);
+    return;
+  }
+
+  mode = hasPre ? "post" : "pre";
+  btn.textContent = "Menyiapkan " + (mode==="pre"?"Pretest":"Posttest") + "…";
+
+  const { data: sessionData, error: sessionError } = await sb.from("sessions")
+    .insert({ nik, nama, divisi, mode, status: "in_progress" })
+    .select("id")
+    .single();
+
+  btn.disabled = false; btn.textContent = "Mulai " + (mode==="pre"?"Pretest":"Posttest");
+
+  if(sessionError){
+    errEl.textContent = "Gagal memulai sesi, coba lagi.";
+    errEl.classList.add("err"); errEl.style.display = "block";
+    return;
+  }
+
+  sessionId = sessionData ? sessionData.id : null;
   idx = 0; answers = new Array(QUESTIONS.length).fill(null);
   renderQuestion();
 }
@@ -267,11 +294,16 @@ function renderQuestion(){
 
 async function finishQuiz(){
   const score = answers.reduce((acc,a,i)=> acc + (a===QUESTIONS[i].correct?1:0), 0);
+  const correctFlags = QUESTIONS.map((q,i)=> answers[i]===q.correct);
   app.innerHTML = `<span class="badge">Menyimpan…</span><h2>Menyimpan hasilmu</h2><p>Mohon tunggu sebentar.</p>`;
 
   const { error } = await sb.from("results").insert({
-    nama, nik, divisi, mode, score, total: QUESTIONS.length
+    nama, nik, divisi, mode, score, total: QUESTIONS.length, answers: correctFlags
   });
+
+  if(sessionId){
+    await sb.from("sessions").update({ status: "done", finished_at: new Date().toISOString() }).eq("id", sessionId);
+  }
 
   if(error){
     const isDuplicate = error.code === "23505"; // unique_violation
@@ -294,13 +326,19 @@ function renderResult(score, saved, note){
     `<div style="display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px dashed var(--line);"><span>${cat}</span><span>${v.correct}/${v.total}</span></div>`
   ).join("");
 
+  const nextNote = saved
+    ? (mode === "pre"
+        ? "Pretest tersimpan. Posttest baru bisa kamu isi nanti setelah materi training selesai — buka link ini lagi saat itu."
+        : "Posttest tersimpan. Terima kasih sudah mengikuti training ini sampai akhir!")
+    : (note || "");
+
   app.innerHTML = `
     <span class="badge">${mode==="pre"?"Hasil Pretest":"Hasil Posttest"}</span>
     <h2>${nama}, ini hasilmu</h2>
     <div class="score-big">${score}/${QUESTIONS.length}</div>
     <p>${Math.round(score/QUESTIONS.length*100)}% jawaban benar.</p>
     <div>${catRows}</div>
-    <div class="save-note ${saved?'ok':'err'}">${saved ? "Hasil tersimpan." : (note||"")}</div>
+    <div class="save-note ${saved?'ok':'err'}">${nextNote}</div>
     <div class="actions">
       <button class="ghost" id="reviewBtn">Tinjau Jawaban</button>
       <button class="primary" id="restartBtn">Kembali ke Awal</button>
@@ -327,61 +365,11 @@ function renderReview(){
   document.getElementById("backBtn").addEventListener("click", renderStart);
 }
 
-async function renderRecap(){
-  app.innerHTML = `<span class="badge">Rekap</span><h2>Memuat data…</h2>`;
-  const { data, error } = await sb.from("results").select("*").order("created_at", { ascending: false }).limit(1000);
-  if(error || !data){
-    app.innerHTML = `<span class="badge">Rekap</span><h2>Gagal memuat</h2><p>Coba lagi nanti.</p><button class="primary" id="backBtn2">Kembali</button>`;
-    document.getElementById("backBtn2").addEventListener("click", renderStart);
-    return;
-  }
-  const pre = data.filter(r=>r.mode==="pre");
-  const post = data.filter(r=>r.mode==="post");
-  const avg = list => list.length ? (list.reduce((a,r)=>a+r.score,0)/list.length).toFixed(1) : "-";
-  const tr = data.map(r=> `<tr><td>${r.nama}</td><td>${r.nik}</td><td>${r.divisi}</td><td>${r.mode==="pre"?"Pre":"Post"}</td><td>${r.score}/${r.total}</td></tr>`).join("");
-
-  app.innerHTML = `
-    <span class="badge">Rekap Peserta</span>
-    <h2>Rekap Hasil</h2>
-    <div class="summary-grid">
-      <div class="summary-box"><div class="n">${pre.length}</div><div class="l">Pengisi Pretest</div></div>
-      <div class="summary-box"><div class="n">${avg(pre)}</div><div class="l">Rata² Pretest</div></div>
-      <div class="summary-box"><div class="n">${post.length}</div><div class="l">Pengisi Posttest</div></div>
-      <div class="summary-box"><div class="n">${avg(post)}</div><div class="l">Rata² Posttest</div></div>
-    </div>
-    ${data.length ? `<div style="max-height:280px; overflow:auto;"><table class="recap"><thead><tr><th>Nama</th><th>NIK</th><th>Divisi</th><th>Mode</th><th>Skor</th></tr></thead><tbody>${tr}</tbody></table></div>` : `<p>Belum ada peserta yang mengisi.</p>`}
-    <div class="actions">
-      <button class="ghost" id="exportBtn">Export CSV</button>
-      <button class="primary" id="backBtn2">Kembali</button>
-    </div>
-  `;
-  document.getElementById("backBtn2").addEventListener("click", renderStart);
-  document.getElementById("exportBtn").addEventListener("click", ()=> exportCsv(data));
+if (initError) {
+  app.innerHTML = `<span class="badge">Belum Terkoneksi</span><h2>Aplikasi belum terhubung ke Supabase</h2><p>${initError}</p>`;
+} else {
+  renderStart();
 }
-
-function csvEscape(v){
-  const s = String(v ?? "");
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
-}
-
-function exportCsv(rows){
-  const header = ["Nama","NIK","Divisi/Posisi","Mode","Skor","Total","Waktu"];
-  const lines = [header.join(",")];
-  rows.forEach(r=>{
-    lines.push([csvEscape(r.nama), csvEscape(r.nik), csvEscape(r.divisi), csvEscape(r.mode==="pre"?"Pretest":"Posttest"), csvEscape(r.score), csvEscape(r.total), csvEscape(r.created_at)].join(","));
-  });
-  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "rekap-pretest-posttest-scrum.csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-renderStart();
 </script>
 </body>
 </html>

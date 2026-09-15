@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Pretest/Posttest Training Scrum Master</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  /* ... CSS dari index.html + tambahan buat chart & layout ... */
+  #app{display:flex;flex-direction:column;gap:28px;align-items:stretch;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px 20px;}
+  #timer{font-variant-numeric:tabular-nums;color:var(--red);font-size:20px;font-family:Cambria,serif;}
+  @keyframes pulse{50%{opacity:0.5;}}
+  .live{animation:pulse 1s ease-in-out infinite;}
+  #progress{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+  .box{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px 24px;}
+  .box h3{margin:0 0 8px;}
+  .box p{margin:0;color:var(--ink-soft);font-size:14px;}
+  .box .val{font-family:Cambria,serif;font-size:24px;font-weight:600;color:var(--navy);margin-top:12px;}
+  #soal{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;}
+  #soal h3{margin:0 0 4px;color:var(--ink);font-size:15px;font-weight:600;}
+  #soal>div{flex:0 1 calc(50% - 6px);}
+  .diff{display:flex;justify-content:space-between;}
+  .diff>div{text-align:center;font-family:Cambria,serif;font-size:18px;font-weight:600;}
+  .pos{color:#1E8449;}
+  .neg{color:#CB4335;}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="mark">SM</div>
+    <div>  
+      <div style="font-size:14px;font-weight:700;">Dashboard <span id="timer">Memuat...</span> <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kembali</a> <a href="admin.html" class="link-btn" style="margin-left:6px;font-size:12px;">Rekap</a></div>
+      <small>Training Scrum Master — Tim IT</small>
+    </div>
+  </div>
+  <div id="app"><div class="panel">Memuat data peserta dan progres...</div></div>
+</div>
+
+<script>
+const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_DENGAN") === -1)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+const app = document.getElementById("app");
+const timer = document.getElementById("timer");
+const QUESTIONS = [ /* ... daftar soal dari index.html ... */ ];
+
+let preScoreChart = null;
+let postScoreChart = null; 
+
+async function refreshData(){
+  const { data:sessions } = await sb  
+    .from("sessions")
+    .select("*");
+  const { data:results } = await sb
+    .from("results")
+    .select("*");
+
+  if(!sessions || !results){
+    app.innerHTML = `<div class="panel">Gagal memuat data, coba muat ulang halaman ini.</div>`;
+    return;
+  }
+
+  app.innerHTML = `
+    <div class="panel">
+      <h2>Progress Peserta</h2>
+      <div id="progress"></div>
+    </div>
+    <div class="panel" style="display:flex;flex-wrap:wrap;gap:28px;justify-content:space-between;">
+      <div>
+        <h2>Skor Pretest</h2>
+        <div style="width:360px;"><canvas id="preScore"></canvas></div>
+      </div>
+      <div>
+        <h2>Skor Posttest</h2>
+        <div style="width:360px;"><canvas id="postScore"></canvas></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Analisis Butir Soal</h2>  
+      <p>Persentase peserta yang menjawab benar tiap soal (Pretest vs Posttest)</p>
+      <div id="soal"></div>
+    </div>
+  `;
+
+  // Jumlah progress  
+  const done = results.length;
+  const progress = sessions.filter(s => s.status === "in_progress").length;
+  const total = done + progress;
+  document.getElementById("progress").innerHTML = `
+    <div class="box">
+      <h3>Selesai</h3>
+      <p>Sudah menyelesaikan Pretest & Posttest</p>  
+      <div class="val">${done}</div>
+    </div>
+    <div class="box">
+      <h3>Sedang Mengerjakan</h3>
+      <p>Sesi aktif yang belum submit</p>
+      <div class="val">${progress}</div>  
+    </div>
+    <div class="box">
+      <h3>Total</h3>
+      <p>Peserta dengan data terekam di sistem</p>
+      <div class="val">${total}</div>
+    </div>
+  `;
+
+  // Chart skor 
+  const preScores = results.filter(r => r.mode === "pre").map(r => r.score);
+  const postScores = results.filter(r => r.mode === "post").map(r => r.score);
+
+  if(preScoreChart) preScoreChart.destroy();
+  if(postScoreChart) postScoreChart.destroy();
+
+  preScoreChart = new Chart(document.getElementById("preScore"), {
+    type: "bar",
+    data: { labels: Array.from({length:QUESTIONS.length+1},(_,i)=>i), datasets: [
+      { data: preScores.reduce((acc,s)=> (acc[s]=(acc[s]||0)+1,acc), Array(QUESTIONS.length+1).fill(0)), 
+        backgroundColor: "#1D4ED8" }
+    ]},
+    options: {
+      plugins: { legend: { display:false } },
+      scales: { x: { title: { display: true, text: "Skor" } },
+                y: { title: { display: true, text: "Jumlah Peserta" }, ticks: { stepSize: 1 } } },
+    }
+  });
+
+  postScoreChart = new Chart(document.getElementById("postScore"), {
+    type: "bar", 
+    data: { labels: Array.from({length:QUESTIONS.length+1},(_,i)=>i), datasets: [
+      { data: postScores.reduce((acc,s)=> (acc[s]=(acc[s]||0)+1,acc), Array(QUESTIONS.length+1).fill(0)),
+        backgroundColor: "#1E8449" }  
+    ]},
+    options: {
+      plugins: { legend: { display:false } },
+      scales: { x: { title: { display: true, text: "Skor" } },  
+                y: { title: { display: true, text: "Jumlah Peserta" }, ticks: { stepSize: 1 } } },
+    }
+  });
+
+  // Analisis butir soal
+  const preAnswers = results.filter(r => r.mode === "pre").flatMap(r => r.answers);  
+  const postAnswers = results.filter(r => r.mode === "post").flatMap(r => r.answers);
+  
+  document.getElementById("soal").innerHTML = QUESTIONS.map((q,i) => {
+    const preCorrect = preAnswers.filter((a,j) => j%QUESTIONS.length === i).filter(Boolean).length;  
+    const postCorrect = postAnswers.filter((a,j) => j%QUESTIONS.length === i).filter(Boolean).length;
+    const prePct = (preCorrect / preAnswers.length * QUESTIONS.length * 100).toFixed(0);
+    const postPct = (postCorrect / postAnswers.length * QUESTIONS.length * 100).toFixed(0);
+    return `
+      <div>
+        <h3>${q.cat} - Soal ${i+1}</h3>
+        <div class="diff">
+          <div>Pretest<br><b>${prePct}%</b></div>  
+          <div>Posttest<br><b>${postPct}%</b></div>
+          <div class="${postPct>prePct ? "pos" : postPct<prePct ? "neg" : ""}">${postPct>prePct ? "+" : ""}${postPct-prePct}%</div>  
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // Live refresh tiap 6 detik  
+  const nextCall = Date.now() + 6000;
+  const reqAnim = window.requestAnimationFrame(() => {
+    const now = Date.now();
+    const diff = Math.round((nextCall - now)/1000);
+    timer.textContent = diff > 0 ? `Refresh in ${diff}s` : "Refreshing..."; 
+    if(now >= nextCall){
+      timer.classList.remove("live");
+      window.cancelAnimationFrame(reqAnim);
+      refreshData();
+    } else {
+      timer.classList.add("live");  
+      window.requestAnimationFrame(arguments.callee);
+    }
+  });
+}
+
+if(!sb){
+  app.innerHTML = `<div class="panel">Tidak dapat terhubung ke database. Periksa SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js.</div>`;  
+} else {  
+  refreshData();
+}
+</script>
+</body>
+</html>
