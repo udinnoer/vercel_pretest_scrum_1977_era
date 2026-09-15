@@ -10,61 +10,62 @@
   /* ... CSS dari index.html + tambahan buat chart & layout ... */
   #app{display:flex;flex-direction:column;gap:28px;align-items:stretch;}
   .panel{
-    background: linear-gradient(to right, var(--navy), #3b5bdb);
+    background: linear-gradient(135deg, var(--navy), #1d4ed8); /* Gradien biru gelap -> sedang */
     color: white;
     border: none;
     padding: 32px 28px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    border-radius:18px;
+    border-radius: 24px; /* Sedikit lebih bulat dari index.html */  
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08); /* Shadow lebih lembut */
   }
   .panel h2, .panel h3, .panel p{color:white;}
   .panel p{opacity:0.8;}
   #timer{font-variant-numeric:tabular-nums;color:var(--red);font-size:20px;font-family:Cambria,serif;}
   @keyframes pulse{50%{opacity:0.5;}}
-  .live{animation:pulse 1s ease-in-out infinite;}
+  .live{animation:pulse 1s ease-in-out infinite;} 
   #progress{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
   .box{
-    background:white;
-    color: var(--gray-text);
-    border:none;
-    border-radius:14px;padding:20px 24px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    background:var(--card); /* Putih di light mode, agak gelap di dark mode */
+    color: var(--ink);
+    border: 2px solid var(--line); /* Border sedikit lebih tebal */
+    border-radius:14px;padding:20px 24px;  
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Shadow halus */
   }
   .box h3{margin:0 0 8px; color:var(--navy);}
-  .box p{margin:0;color:var(--gray-text);font-size:14px;}
+  .box p{margin:0;color:var(--ink-soft);font-size:14px;}  
   .box .val{font-family:Cambria,serif;font-size:24px;font-weight:600;color:var(--red);margin-top:12px;}
   #soal{
-    display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;
-    background: white;
-    border-radius: 8px;
-    padding: 20px 24px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between; /* Sedikit lebih renggang */
+    background: var(--card); /* Putih di light mode, agak gelap di dark mode */
+    border-radius: 18px; 
+    border: 2px solid var(--line); /* Border sedikit lebih tebal */
+    padding: 24px 28px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Shadow halus */
   }
   #soal>div{
-    flex: 0 1 calc(50% - 6px);
+    flex: 0 1 calc(50% - 8px); /* Sedikit lebih sempit */
     padding: 16px 0;
-    border-bottom: 1px solid var(--gray-bg);
+    border-bottom: 2px solid var(--line); /* Border sedikit lebih tebal */
   }
-  #soal>div:nth-last-child(-n+2){border:none;}
-  #soal h3{margin:0 0 4px;color:var(--gray-text);font-size:15px;font-weight:600;}
-  .diff{display:flex;justify-content:space-around;}
+  #soal>div:nth-last-child(-n+2){border:none;} 
+  #soal h3{margin:0 0 4px;color:var(--ink);font-size:15px;font-weight:600;}
+  .diff{display:flex;justify-content:space-around;} 
   .diff>div{
     text-align:center;
     font-family:Cambria,serif;
     font-size:18px;
-    font-weight:600;
-    background: var(--gray-bg);
+    font-weight:600;  
+    background: var(--paper); /* Abu-abu muda di light mode, navy gelap di dark mode */
     padding: 8px 12px;
-    border-radius: 8px;
-    color: var(--gray-text);
+    border-radius: 8px; 
+    color: var(--ink);
   }
   .pos{
-    background: #bbf7d0 !important;
-    color: #15803d !important;
+    background: #d1fae5 !important; /* Hijau cerah untuk kenaikan */ 
+    color: #065f46 !important;
   }
   .neg{
-    background: #fecaca !important;
-    color: #dc2626 !important;
+    background: #fee2e2 !important; /* Merah cerah untuk penurunan */
+    color: #991b1b !important; 
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
