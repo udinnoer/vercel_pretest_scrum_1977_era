@@ -7,66 +7,71 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <style>
-  /* ... CSS dari index.html + tambahan buat chart & layout ... */
-  #app{display:flex;flex-direction:column;gap:28px;align-items:stretch;}
-  .panel{
-    background: linear-gradient(135deg, var(--navy), #1d4ed8); /* Gradien biru gelap -> sedang */
-    color: white;
-    border: none;
-    padding: 32px 28px;
-    border-radius: 24px; /* Sedikit lebih bulat dari index.html */  
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08); /* Shadow lebih lembut */
+  :root{
+    --navy:#283990; --red:#E23633; --paper:#F6F5F2; --card:#FFFFFF;
+    --ink:#1C1E2B; --ink-soft:#5B5F76; --line:#DEDCE8;
   }
-  .panel h2, .panel h3, .panel p{color:white;}
-  .panel p{opacity:0.8;}
-  #timer{font-variant-numeric:tabular-nums;color:var(--red);font-size:20px;font-family:Cambria,serif;}
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#14162A; --card:#1D2040; --ink:#EEEFF7; --ink-soft:#A9ADC7; --line:#33365C; }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    min-height:100vh; display:flex; justify-content:center; padding:32px 16px 60px;
+  }
+  h1,h2,h3{font-family:Cambria,Georgia,serif; margin:0 0 6px; font-weight:700;}
+  .wrap{width:100%; max-width:900px;}
+  .top{display:flex; align-items:center; gap:12px; margin-bottom:22px;}
+  .mark{
+    width:40px;height:40px;border-radius:50%; background:var(--navy); flex:none;
+    display:flex;align-items:center;justify-content:center; color:#fff;
+    font-family:Cambria,serif; font-weight:700; font-size:18px;
+  }
+  .top small{color:var(--ink-soft); font-size:13px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px 26px;}
+  .badge{
+    display:inline-block; font-size:12.5px; color:var(--red); border:1px solid var(--red);
+    border-radius:999px; padding:3px 12px; margin-bottom:14px;
+  }
+  p{line-height:1.55; color:var(--ink-soft); font-size:15px;}
+  button.primary{
+    padding:12px 20px; border:none; border-radius:12px; background:var(--red);
+    color:#fff; font-size:15px; font-weight:700; cursor:pointer;
+  }
+  button.ghost{
+    background:transparent; border:1.5px solid var(--line); color:var(--ink);
+    border-radius:12px; padding:12px 20px; font-size:15px; cursor:pointer;
+  }
+  .link-btn{background:none;border:none;color:var(--navy);text-decoration:underline;font-size:13.5px;cursor:pointer;padding:0;}
+  a.link-btn{text-decoration:none;}
+  a.link-btn:hover{text-decoration:underline;}
+  .actions{display:flex; gap:10px; margin-top:20px;}
+
+  /* Elemen tambahan dashboard — memakai token warna & bentuk yang sama seperti index.html */
+  #app{display:flex; flex-direction:column; gap:24px; align-items:stretch;}
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px 26px; }
+
+  #timer{font-variant-numeric:tabular-nums; color:var(--red); font-size:14px; font-family:Calibri,sans-serif; font-weight:normal;}
   @keyframes pulse{50%{opacity:0.5;}}
-  .live{animation:pulse 1s ease-in-out infinite;} 
-  #progress{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
-  .box{
-    background:var(--card); /* Putih di light mode, agak gelap di dark mode */
-    color: var(--ink);
-    border: 2px solid var(--line); /* Border sedikit lebih tebal */
-    border-radius:14px;padding:20px 24px;  
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Shadow halus */
-  }
-  .box h3{margin:0 0 8px; color:var(--navy);}
-  .box p{margin:0;color:var(--ink-soft);font-size:14px;}  
-  .box .val{font-family:Cambria,serif;font-size:24px;font-weight:600;color:var(--red);margin-top:12px;}
-  #soal{
-    display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between; /* Sedikit lebih renggang */
-    background: var(--card); /* Putih di light mode, agak gelap di dark mode */
-    border-radius: 18px; 
-    border: 2px solid var(--line); /* Border sedikit lebih tebal */
-    padding: 24px 28px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Shadow halus */
-  }
-  #soal>div{
-    flex: 0 1 calc(50% - 8px); /* Sedikit lebih sempit */
-    padding: 16px 0;
-    border-bottom: 2px solid var(--line); /* Border sedikit lebih tebal */
-  }
-  #soal>div:nth-last-child(-n+2){border:none;} 
-  #soal h3{margin:0 0 4px;color:var(--ink);font-size:15px;font-weight:600;}
-  .diff{display:flex;justify-content:space-around;} 
+  .live{animation:pulse 1s ease-in-out infinite;}
+
+  #progress{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-top:16px;}
+  .box{background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:18px 20px;}
+  .box h3{margin:0 0 6px; font-size:14px; color:var(--ink);}
+  .box p{margin:0; font-size:13px; color:var(--ink-soft);}
+  .box .val{font-family:Cambria,serif; font-size:26px; font-weight:700; color:var(--navy); margin-top:10px;}
+
+  #soal{display:flex; flex-wrap:wrap; gap:14px; margin-top:16px;}
+  #soal>div{flex:0 1 calc(50% - 7px); background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:14px 16px;}
+  #soal h3{margin:0 0 8px; font-size:14px; color:var(--ink); font-weight:600;}
+  .diff{display:flex; justify-content:space-around; gap:8px;}
   .diff>div{
-    text-align:center;
-    font-family:Cambria,serif;
-    font-size:18px;
-    font-weight:600;  
-    background: var(--paper); /* Abu-abu muda di light mode, navy gelap di dark mode */
-    padding: 8px 12px;
-    border-radius: 8px; 
-    color: var(--ink);
+    text-align:center; font-family:Cambria,serif; font-size:16px; font-weight:700;
+    background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 10px; color:var(--ink-soft);
   }
-  .pos{
-    background: #d1fae5 !important; /* Hijau cerah untuk kenaikan */ 
-    color: #065f46 !important;
-  }
-  .neg{
-    background: #fee2e2 !important; /* Merah cerah untuk penurunan */
-    color: #991b1b !important; 
-  }
+  .diff>div.pos{color:#2E8B57; border-color:#2E8B57;}
+  .diff>div.neg{color:var(--red); border-color:var(--red);}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -89,7 +94,23 @@ const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_D
 
 const app = document.getElementById("app");
 const timer = document.getElementById("timer");
-const QUESTIONS = [ /* ... daftar soal dari index.html ... */ ];
+const QUESTIONS = [
+  {cat:"Fondasi Agile", q:"Agile Manifesto lahir dari diskusi 17 praktisi software pada tahun berapa?"},
+  {cat:"Fondasi Agile", q:"Manakah pernyataan berikut yang justru BERTENTANGAN dengan nilai inti Agile Manifesto?"},
+  {cat:"Mengenal Scrum", q:"Kenapa Scrum dianggap cocok untuk pengembangan software?"},
+  {cat:"Mengenal Scrum", q:"Ada berapa pilar (pillars) dalam Scrum?"},
+  {cat:"Mengenal Scrum", q:"Berikut ini termasuk nilai (values) Scrum, KECUALI:"},
+  {cat:"Scrum Actors", q:"Siapa yang bertanggung jawab memaksimalkan nilai produk dan mengelola Product Backlog?"},
+  {cat:"Scrum Actors", q:"Apa peran utama Scrum Master dalam tim?"},
+  {cat:"Scrum Events", q:"Event yang dilakukan setiap hari, maksimal 15 menit, untuk sinkronisasi progress tim disebut?"},
+  {cat:"Scrum Events", q:"Pada event apa tim mendemonstrasikan increment (hasil kerja) kepada stakeholder?"},
+  {cat:"Scrum Events", q:"Apa tujuan utama Sprint Retrospective?"},
+  {cat:"Scrum Events", q:"Pada Sprint Planning, siapa yang menentukan BAGAIMANA (how) pekerjaan akan diselesaikan?"},
+  {cat:"Waterfall & Scrum", q:"Pola \"Water-Scrum-Fall\" merujuk pada kondisi di mana?"},
+  {cat:"Bekal Praktik", q:"Dalam hierarki Product Backlog, hubungan yang benar adalah?"},
+  {cat:"Bekal Praktik", q:"Skala yang umum dipakai untuk Story Point saat Planning Poker adalah?"},
+  {cat:"Bekal Praktik", q:"Pada board retrospective ala EasyRetro, catatan di kolom \"To Improve\" dengan vote tertinggi biasanya diarahkan menjadi?"}
+];
 
 let preScoreChart = null;
 let postScoreChart = null; 
@@ -184,42 +205,43 @@ async function refreshData(){
     }
   });
 
-  // Analisis butir soal
+  const preN = results.filter(r => r.mode === "pre").length;
+  const postN = results.filter(r => r.mode === "post").length;
   const preAnswers = results.filter(r => r.mode === "pre").flatMap(r => r.answers);  
   const postAnswers = results.filter(r => r.mode === "post").flatMap(r => r.answers);
   
   document.getElementById("soal").innerHTML = QUESTIONS.map((q,i) => {
     const preCorrect = preAnswers.filter((a,j) => j%QUESTIONS.length === i).filter(Boolean).length;  
     const postCorrect = postAnswers.filter((a,j) => j%QUESTIONS.length === i).filter(Boolean).length;
-    const prePct = (preCorrect / preAnswers.length * QUESTIONS.length * 100).toFixed(0);
-    const postPct = (postCorrect / postAnswers.length * QUESTIONS.length * 100).toFixed(0);
+    const prePct = preN > 0 ? (preCorrect / preN * 100).toFixed(0) : null;
+    const postPct = postN > 0 ? (postCorrect / postN * 100).toFixed(0) : null;
+    const diff = (prePct !== null && postPct !== null) ? (postPct - prePct) : null;
     return `
       <div>
         <h3>${q.cat} - Soal ${i+1}</h3>
         <div class="diff">
-          <div>Pretest<br><b>${prePct}%</b></div>  
-          <div>Posttest<br><b>${postPct}%</b></div>
-          <div class="${postPct>prePct ? "pos" : postPct<prePct ? "neg" : ""}">${postPct>prePct ? "+" : ""}${postPct-prePct}%</div>  
+          <div>Pretest<br><b>${prePct !== null ? prePct+"%" : "-"}</b></div>  
+          <div>Posttest<br><b>${postPct !== null ? postPct+"%" : "-"}</b></div>
+          <div class="${diff !== null ? (diff>0?"pos":diff<0?"neg":"") : ""}">${diff !== null ? (diff>0?"+":"")+diff+"%" : "-"}</div>  
         </div>
       </div>
     `;
   }).join("");
 
-  // Live refresh tiap 6 detik  
-  const nextCall = Date.now() + 6000;
-  const reqAnim = window.requestAnimationFrame(() => {
-    const now = Date.now();
-    const diff = Math.round((nextCall - now)/1000);
-    timer.textContent = diff > 0 ? `Refresh in ${diff}s` : "Refreshing..."; 
-    if(now >= nextCall){
-      timer.classList.remove("live");
-      window.cancelAnimationFrame(reqAnim);
+  // Live refresh tiap 6 detik
+  let secondsLeft = 6;
+  timer.classList.add("live");
+  timer.textContent = `Refresh in ${secondsLeft}s`;
+  const countdown = setInterval(() => {
+    secondsLeft -= 1;
+    if(secondsLeft <= 0){
+      clearInterval(countdown);
+      timer.textContent = "Refreshing...";
       refreshData();
     } else {
-      timer.classList.add("live");  
-      window.requestAnimationFrame(arguments.callee);
+      timer.textContent = `Refresh in ${secondsLeft}s`;
     }
-  });
+  }, 1000);
 }
 
 if(!sb){
