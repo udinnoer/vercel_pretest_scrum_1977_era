@@ -48,6 +48,7 @@
     color:#fff; font-size:16px; font-weight:700; cursor:pointer;
   }
   button.primary:disabled{opacity:.4; cursor:not-allowed;}
+  button.primary.green{background:#2E8B57;}
   button.ghost{
     background:transparent; border:1.5px solid var(--line); color:var(--ink);
     border-radius:12px; padding:13px; font-size:15px; cursor:pointer;
@@ -199,12 +200,12 @@ function renderStart(){
     <input type="text" id="nikInput" placeholder="NIK *" value="${nik}">
     <input type="text" id="divisiInput" placeholder="Divisi / Posisi *" value="${divisi}">
     <div class="save-note" id="startError" style="display:none;"></div>
-    <button class="primary" id="startBtn">Mulai Pretest</button>
+    <button class="primary" id="startBtn">Lanjutkan</button>
   `;
-  document.getElementById("startBtn").addEventListener("click", handleStart);
+  document.getElementById("startBtn").addEventListener("click", checkStatus);
 }
 
-async function handleStart(){
+async function checkStatus(){
   const errEl = document.getElementById("startError");
   const namaVal = document.getElementById("namaInput").value.trim();
   const nikVal = document.getElementById("nikInput").value.trim();
@@ -224,7 +225,7 @@ async function handleStart(){
   const { data, error } = await sb.from("results").select("mode").eq("nik", nik);
 
   if(error){
-    btn.disabled = false; btn.textContent = "Mulai Pretest";
+    btn.disabled = false; btn.textContent = "Lanjutkan";
     errEl.textContent = "Gagal memeriksa status, coba lagi.";
     errEl.classList.add("err"); errEl.style.display = "block";
     return;
@@ -246,16 +247,30 @@ async function handleStart(){
   }
 
   mode = hasPre ? "post" : "pre";
-  btn.textContent = "Menyiapkan " + (mode==="pre"?"Pretest":"Posttest") + "…";
+
+  btn.disabled = false;
+  btn.textContent = "Mulai " + (mode==="pre"?"Pretest":"Posttest");
+  if(mode === "post"){
+    btn.classList.add("green");
+  } else {
+    btn.classList.remove("green");
+  }
+  btn.replaceWith(btn.cloneNode(true)); // buang listener lama (checkStatus)
+  document.getElementById("startBtn").addEventListener("click", beginQuiz);
+}
+
+async function beginQuiz(){
+  const errEl = document.getElementById("startError");
+  const btn = document.getElementById("startBtn");
+  btn.disabled = true; btn.textContent = "Menyiapkan " + (mode==="pre"?"Pretest":"Posttest") + "…";
 
   const { data: sessionData, error: sessionError } = await sb.from("sessions")
     .insert({ nik, nama, divisi, mode, status: "in_progress" })
     .select("id")
     .single();
 
-  btn.disabled = false; btn.textContent = "Mulai " + (mode==="pre"?"Pretest":"Posttest");
-
   if(sessionError){
+    btn.disabled = false; btn.textContent = "Mulai " + (mode==="pre"?"Pretest":"Posttest");
     errEl.textContent = "Gagal memulai sesi, coba lagi.";
     errEl.classList.add("err"); errEl.style.display = "block";
     return;
