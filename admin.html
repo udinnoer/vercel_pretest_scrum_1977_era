@@ -91,7 +91,7 @@
   <div class="top">
     <div class="mark">SM</div>
     <div>
-      <div style="font-size:14px;font-weight:700;">Rekap Peserta <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kembali</a> <a href="dashboard.html" class="link-btn" style="margin-left:6px;font-size:12px;">Dashboard</a></div>
+      <div style="font-size:14px;font-weight:700;">Rekap Peserta <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kembali</a> <a href="dashboard.html" class="link-btn" style="margin-left:6px;font-size:12px;">Dashboard</a> <a href="kelompok.html" class="link-btn" style="margin-left:6px;font-size:12px;">Kelompok</a></div>
       <small>Training Scrum Master — Tim IT</small>  
     </div>
   </div>
@@ -118,6 +118,12 @@ async function renderRecap(){
   const pre = results.filter(r=>r.mode==="pre");
   const post = results.filter(r=>r.mode==="post");
   const avg = list => list.length ? (list.reduce((a,r)=>a+r.score,0)/list.length).toFixed(1) : "-";
+
+  const attendanceRows = pre.map((r,i)=>
+    `<tr>
+      <td>${i+1}</td><td>${r.nama}</td><td>${r.nik}</td><td>${r.divisi}</td><td>${r.created_at}</td>
+    </tr>`
+  ).join("");
 
   const resultRows = results.map(r=>
     `<tr>
@@ -151,16 +157,42 @@ async function renderRecap(){
       <tbody>${sessionRows}</tbody>
     </table>` : ""}
 
-    <h3 style="margin-top:${inProgress.length > 0 ? 16 : 24}px;">Hasil Lengkap (${results.length})</h3>
+    <h3 style="margin-top:${inProgress.length > 0 ? 16 : 24}px;">Daftar Hadir / Peserta Terdaftar (${pre.length})</h3>
+    <p style="margin:0 0 8px;">Peserta yang sudah mengisi Pretest — otomatis tercatat sebagai peserta training yang hadir.</p>
+    <table class="recap">
+      <thead><tr><th>No</th><th>Nama</th><th>NIK</th><th>Divisi</th><th>Waktu Absen</th></tr></thead>
+      <tbody>${attendanceRows}</tbody>
+    </table>
+
+    <h3 style="margin-top:24px;">Hasil Lengkap (${results.length})</h3>
     <table class="recap">
       <thead><tr><th>Nama</th><th>NIK</th><th>Divisi</th><th>Mode</th><th>Skor</th><th>Waktu</th></tr></thead>
       <tbody>${resultRows}</tbody>
     </table>
     <div class="actions">
-      <button class="ghost" id="exportBtn">Export CSV</button>
+      <button class="ghost" id="exportAttendanceBtn">Export Daftar Hadir</button>
+      <button class="ghost" id="exportBtn">Export Hasil Lengkap</button>
     </div>
   `;
   document.getElementById("exportBtn").addEventListener("click", ()=> exportCsv(results));
+  document.getElementById("exportAttendanceBtn").addEventListener("click", ()=> exportAttendance(pre));
+}
+
+function exportAttendance(rows){
+  const header = ["No","Nama","NIK","Divisi/Posisi","Waktu Absen"];
+  const lines = [header.join(",")];
+  rows.forEach((r,i)=>{
+    lines.push([i+1, csvEscape(r.nama), csvEscape(r.nik), csvEscape(r.divisi), csvEscape(r.created_at)].join(","));
+  });
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `daftar-hadir-scrum-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function csvEscape(v){
