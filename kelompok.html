@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kelompok — Training Scrum Master</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --navy:#283990; --red:#E23633; --paper:#F6F5F2; --card:#FFFFFF;
+    --ink:#1C1E2B; --ink-soft:#5B5F76; --line:#DEDCE8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#14162A; --card:#1D2040; --ink:#EEEFF7; --ink-soft:#A9ADC7; --line:#33365C; }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    min-height:100vh; display:flex; justify-content:center; padding:32px 16px 60px;
+  }
+  h1,h2,h3{font-family:Cambria,Georgia,serif; margin:0 0 6px; font-weight:700;}
+  .wrap{width:100%; max-width:900px;}
+  .top{display:flex; align-items:center; gap:12px; margin-bottom:22px;}
+  .mark{
+    width:40px;height:40px;border-radius:50%; background:var(--navy); flex:none;
+    display:flex;align-items:center;justify-content:center; color:#fff;
+    font-family:Cambria,serif; font-weight:700; font-size:18px;
+  }
+  .top small{color:var(--ink-soft); font-size:13px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px 26px;}
+  .badge{
+    display:inline-block; font-size:12.5px; color:var(--red); border:1px solid var(--red);
+    border-radius:999px; padding:3px 12px; margin-bottom:14px;
+  }
+  p{line-height:1.55; color:var(--ink-soft); font-size:15px;}
+  .save-note{font-size:13.5px; color:var(--ink-soft); margin:6px 0 14px;}
+  .save-note.err{color:var(--red);}
+  .save-note.ok{color:#2E8B57;}
+  input[type=number]{
+    padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+    background:transparent; color:var(--ink); font-size:15px; width:120px;
+  }
+  input[type=number]:focus{outline:2px solid var(--navy); border-color:var(--navy);}
+  button.primary{
+    padding:12px 20px; border:none; border-radius:12px; background:var(--red);
+    color:#fff; font-size:15px; font-weight:700; cursor:pointer;
+  }
+  button.primary:disabled{opacity:.4; cursor:not-allowed;}
+  button.ghost{
+    background:transparent; border:1.5px solid var(--line); color:var(--ink);
+    border-radius:12px; padding:12px 20px; font-size:15px; cursor:pointer;
+  }
+  .link-btn{background:none;border:none;color:var(--navy);text-decoration:underline;font-size:13.5px;cursor:pointer;padding:0;}
+  a.link-btn{text-decoration:none;}
+  a.link-btn:hover{text-decoration:underline;}
+  .actions{display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;}
+
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px 26px; margin-bottom:24px; }
+  .form-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:16px 0;}
+  .form-row label{font-size:14px; color:var(--ink);}
+
+  .groups-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:16px;}
+  .group-box{background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:16px 18px;}
+  .group-box h3{margin:0 0 10px; color:var(--navy); font-size:16px;}
+  .group-box ul{list-style:none; margin:0; padding:0;}
+  .group-box li{
+    padding:8px 0; border-bottom:1px solid var(--line); font-size:14px;
+    display:flex; justify-content:space-between; gap:8px;
+  }
+  .group-box li:last-child{border-bottom:none;}
+  .group-box li .divisi-tag{
+    font-size:11px; color:var(--ink-soft); background:var(--card); border:1px solid var(--line);
+    border-radius:999px; padding:2px 8px; white-space:nowrap;
+  }
+
+  .balance-check{margin-top:20px;}
+  table.recap{width:100%; border-collapse:collapse; font-size:13px; margin-top:10px;}
+  table.recap th,table.recap td{text-align:center; padding:8px 6px; border-bottom:1px solid var(--line);}
+  table.recap th{color:var(--ink-soft); font-weight:600;}
+  table.recap td:first-child, table.recap th:first-child{text-align:left;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="mark">SM</div>
+    <div>
+      <div style="font-size:14px;font-weight:700;">Pembentukan Kelompok <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kuis</a> <a href="admin.html" class="link-btn" style="margin-left:6px;font-size:12px;">Rekap</a> <a href="dashboard.html" class="link-btn" style="margin-left:6px;font-size:12px;">Dashboard</a></div>
+      <small>Training Scrum Master — Tim IT</small>
+    </div>
+  </div>
+  <div id="app" class="panel">Memuat data peserta…</div>
+</div>
+
+<script>
+const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_DENGAN") === -1)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+const app = document.getElementById("app");
+let participants = [];   // roster dari pretest (nik unik)
+let currentGroups = null; // hasil generate terakhir (preview, belum tentu tersimpan)
+
+// Fisher-Yates shuffle
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1; i>0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+// Bagi peserta ke N kelompok, divisi disebar merata lewat round-robin per divisi
+function buildGroups(people, n){
+  const byDivisi = {};
+  people.forEach(p=>{
+    byDivisi[p.divisi] = byDivisi[p.divisi] || [];
+    byDivisi[p.divisi].push(p);
+  });
+  const divisiNames = shuffle(Object.keys(byDivisi));
+  const groups = Array.from({length:n}, ()=>[]);
+  let pointer = 0;
+  divisiNames.forEach(dName=>{
+    const shuffled = shuffle(byDivisi[dName]);
+    shuffled.forEach(person=>{
+      groups[pointer % n].push(person);
+      pointer++;
+    });
+  });
+  return groups;
+}
+
+async function loadParticipants(){
+  app.innerHTML = `<h2>Memuat data peserta…</h2>`;
+  const { data, error } = await sb.from("results").select("nik,nama,divisi").eq("mode","pre").order("created_at",{ascending:true});
+  if(error){
+    app.innerHTML = `<span class="badge">Gagal Memuat</span><h2>Tidak bisa mengambil data peserta</h2><p>Coba muat ulang halaman ini.</p>`;
+    return;
+  }
+  // Dedupe by NIK (jaga-jaga)
+  const seen = new Set();
+  participants = (data||[]).filter(p=>{
+    if(seen.has(p.nik)) return false;
+    seen.add(p.nik); return true;
+  });
+
+  const { data: savedGroups } = await sb.from("groups").select("*").order("group_no",{ascending:true});
+
+  renderForm(savedGroups && savedGroups.length ? savedGroups : null);
+}
+
+function renderForm(savedGroups){
+  const divisiSet = [...new Set(participants.map(p=>p.divisi))];
+  app.innerHTML = `
+    <span class="badge">${participants.length} Peserta Terdaftar (dari Pretest)</span>
+    <h2>Bentuk Kelompok Training</h2>
+    <p>Peserta akan dibagi rata ke beberapa kelompok, dengan divisi disebar sebisa mungkin merata di tiap kelompok (bukan random murni). Data diambil dari peserta yang sudah mengisi Pretest — total ${divisiSet.length} divisi berbeda.</p>
+    <div class="form-row">
+      <label for="numGroups">Jumlah kelompok:</label>
+      <input type="number" id="numGroups" min="2" max="${Math.max(2,participants.length)}" value="4">
+      <button class="primary" id="generateBtn">Buat Kelompok Acak</button>
+    </div>
+    <div class="save-note" id="formError" style="display:none;"></div>
+    <div id="result"></div>
+  `;
+  document.getElementById("generateBtn").addEventListener("click", onGenerate);
+
+  if(savedGroups){
+    currentGroups = null;
+    renderSavedGroups(savedGroups);
+  }
+}
+
+function onGenerate(){
+  const errEl = document.getElementById("formError");
+  errEl.style.display="none";
+  const n = parseInt(document.getElementById("numGroups").value, 10);
+
+  if(!n || n < 2){
+    errEl.textContent = "Jumlah kelompok minimal 2.";
+    errEl.style.display = "block";
+    return;
+  }
+  if(participants.length === 0){
+    errEl.textContent = "Belum ada peserta yang mengisi Pretest.";
+    errEl.style.display = "block";
+    return;
+  }
+  if(n > participants.length){
+    errEl.textContent = "Jumlah kelompok tidak boleh lebih banyak dari jumlah peserta.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  currentGroups = buildGroups(participants, n);
+  renderGroupsPreview(currentGroups, false);
+}
+
+function divisiBalanceTable(groups){
+  const divisiSet = [...new Set(groups.flat().map(p=>p.divisi))];
+  const rows = divisiSet.map(dName=>{
+    const cells = groups.map(g => g.filter(p=>p.divisi===dName).length);
+    return `<tr><td>${dName}</td>${cells.map(c=>`<td>${c}</td>`).join("")}</tr>`;
+  }).join("");
+  const header = groups.map((_,i)=>`<th>K${i+1}</th>`).join("");
+  return `
+    <div class="balance-check">
+      <h3 style="font-size:14px;">Cek Sebaran Divisi per Kelompok</h3>
+      <table class="recap">
+        <thead><tr><th>Divisi</th>${header}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderGroupsPreview(groups, saved){
+  const resultEl = document.getElementById("result");
+  const boxes = groups.map((g,i)=>`
+    <div class="group-box">
+      <h3>Kelompok ${i+1} (${g.length} orang)</h3>
+      <ul>
+        ${g.map(p=>`<li><span>${p.nama}</span><span class="divisi-tag">${p.divisi}</span></li>`).join("")}
+      </ul>
+    </div>
+  `).join("");
+
+  resultEl.innerHTML = `
+    <div class="save-note ${saved ? 'ok' : ''}">${saved ? "Kelompok ini sudah tersimpan dan bisa dilihat lagi nanti." : "Ini baru pratinjau — klik \"Simpan Kelompok\" kalau sudah cocok, atau \"Acak Ulang\" untuk kombinasi lain."}</div>
+    <div class="groups-grid">${boxes}</div>
+    ${divisiBalanceTable(groups)}
+    <div class="actions">
+      ${!saved ? `<button class="ghost" id="reshuffleBtn">Acak Ulang</button><button class="primary" id="saveBtn">Simpan Kelompok</button>` : `<button class="primary" id="regenBtn">Buat Ulang (Acak Baru)</button>`}
+    </div>
+  `;
+
+  if(!saved){
+    document.getElementById("reshuffleBtn").addEventListener("click", onGenerate);
+    document.getElementById("saveBtn").addEventListener("click", saveGroups);
+  } else {
+    document.getElementById("regenBtn").addEventListener("click", onGenerate);
+  }
+}
+
+async function renderSavedGroups(savedRows){
+  const grouped = {};
+  savedRows.forEach(r=>{
+    grouped[r.group_no] = grouped[r.group_no] || [];
+    grouped[r.group_no].push({nama:r.nama, nik:r.nik, divisi:r.divisi});
+  });
+  const groups = Object.keys(grouped).sort((a,b)=>a-b).map(k=>grouped[k]);
+  renderGroupsPreview(groups, true);
+}
+
+async function saveGroups(){
+  if(!currentGroups) return;
+  const saveBtn = document.getElementById("saveBtn");
+  saveBtn.disabled = true; saveBtn.textContent = "Menyimpan…";
+
+  await sb.from("groups").delete().neq("id","00000000-0000-0000-0000-000000000000"); // hapus semua kelompok lama
+
+  const rows = [];
+  currentGroups.forEach((g,i)=>{
+    g.forEach(p=>{
+      rows.push({ nik:p.nik, nama:p.nama, divisi:p.divisi, group_no:i+1 });
+    });
+  });
+
+  const { error } = await sb.from("groups").insert(rows);
+  if(error){
+    saveBtn.disabled = false; saveBtn.textContent = "Simpan Kelompok";
+    const errEl = document.getElementById("formError");
+    errEl.textContent = "Gagal menyimpan kelompok, coba lagi.";
+    errEl.style.display = "block";
+    return;
+  }
+  renderGroupsPreview(currentGroups, true);
+}
+
+if(!sb){
+  app.innerHTML = `<span class="badge">Konfigurasi Tidak Ditemukan</span><h2>Tidak dapat terhubung ke database</h2><p>Periksa SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js.</p>`;
+} else {
+  loadParticipants();
+}
+</script>
+</body>
+</html>
