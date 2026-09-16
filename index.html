@@ -187,6 +187,83 @@ let idx = 0;
 let answers = new Array(QUESTIONS.length).fill(null);
 const app = document.getElementById("app");
 
+const LOCAL_KEY = "scrum_participant_v1";
+
+function saveParticipantLocal(){
+  try{
+    localStorage.setItem(LOCAL_KEY, JSON.stringify({ nama, nik, divisi }));
+  }catch(e){ /* localStorage tidak tersedia, abaikan */ }
+}
+
+function loadParticipantLocal(){
+  try{
+    const raw = localStorage.getItem(LOCAL_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+function clearParticipantLocal(){
+  try{ localStorage.removeItem(LOCAL_KEY); }catch(e){ /* abaikan */ }
+}
+
+async function renderWelcomeBack(saved){
+  app.innerHTML = `<h2>Memuat data kamu…</h2><p>Mohon tunggu sebentar.</p>`;
+
+  nama = saved.nama; nik = saved.nik; divisi = saved.divisi;
+
+  const [{ data: resultData }, { data: groupData }] = await Promise.all([
+    sb.from("results").select("mode,score,total").eq("nik", nik),
+    sb.from("groups").select("group_no").eq("nik", nik).limit(1)
+  ]);
+
+  const preResult = (resultData||[]).find(r=>r.mode==="pre");
+  const postResult = (resultData||[]).find(r=>r.mode==="post");
+  const groupNo = (groupData && groupData.length) ? groupData[0].group_no : null;
+
+  const statusBox = (label, result) => `
+    <div class="summary-box">
+      <div class="n">${result ? result.score+"/"+result.total : "-"}</div>
+      <div class="l">${label}${result ? "" : " (belum diisi)"}</div>
+    </div>
+  `;
+
+  let actionHtml = "";
+  if(!preResult){
+    mode = "pre";
+    actionHtml = `<button class="primary" id="startBtn">Mulai Pretest</button>`;
+  } else if(!postResult){
+    mode = "post";
+    actionHtml = `<button class="primary green" id="startBtn">Mulai Posttest</button>`;
+  } else {
+    actionHtml = `<p style="text-align:center; margin-top:16px;">Kamu sudah menyelesaikan Pretest dan Posttest. Terima kasih!</p>`;
+  }
+
+  app.innerHTML = `
+    <span class="badge">Selamat Datang Kembali</span>
+    <h2>Halo, ${nama}!</h2>
+    <p>${divisi}${groupNo ? " · Kelompok " + groupNo : ""}</p>
+    <div class="summary-grid">
+      ${statusBox("Pretest", preResult)}
+      ${statusBox("Posttest", postResult)}
+    </div>
+    <div id="welcomeAction" style="margin-top:16px;">${actionHtml}</div>
+    <div class="save-note" id="startError" style="display:none;"></div>
+    <div style="text-align:center; margin-top:14px;">
+      <button class="link-btn" id="notMeBtn">Bukan ${nama}? Ganti data</button>
+    </div>
+  `;
+
+  const startActionBtn = document.getElementById("startBtn");
+  if(startActionBtn){
+    startActionBtn.addEventListener("click", beginQuiz);
+  }
+  document.getElementById("notMeBtn").addEventListener("click", ()=>{
+    clearParticipantLocal();
+    nama = ""; nik = ""; divisi = "";
+    renderStart();
+  });
+}
+
 function renderStart(){
   if(!sb){
     app.innerHTML = `<span class="badge">Setup belum selesai</span><h2>Konfigurasi Supabase belum diisi</h2><p>Isi SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js, lalu deploy ulang.</p>`;
@@ -218,6 +295,7 @@ async function checkStatus(){
     return;
   }
   nama = namaVal; nik = nikVal; divisi = divisiVal;
+  saveParticipantLocal();
 
   const btn = document.getElementById("startBtn");
   btn.disabled = true; btn.textContent = "Memeriksa status…";
@@ -242,7 +320,7 @@ async function checkStatus(){
       <p>Pretest dan Posttest untuk NIK ${nik} sudah tercatat. Tidak perlu mengisi lagi. Terima kasih!</p>
       <button class="primary" id="backBtn0">Kembali</button>
     `;
-    document.getElementById("backBtn0").addEventListener("click", renderStart);
+    document.getElementById("backBtn0").addEventListener("click", initApp);
     return;
   }
 
@@ -359,7 +437,7 @@ function renderResult(score, saved, note){
       <button class="primary" id="restartBtn">Kembali ke Awal</button>
     </div>
   `;
-  document.getElementById("restartBtn").addEventListener("click", renderStart);
+  document.getElementById("restartBtn").addEventListener("click", initApp);
   document.getElementById("reviewBtn").addEventListener("click", renderReview);
 }
 
@@ -377,13 +455,22 @@ function renderReview(){
     </div>`;
   }).join("");
   app.innerHTML = `<span class="badge">Tinjauan Jawaban</span><h2>Pembahasan</h2>${rows}<button class="primary" id="backBtn">Kembali ke Awal</button>`;
-  document.getElementById("backBtn").addEventListener("click", renderStart);
+  document.getElementById("backBtn").addEventListener("click", initApp);
+}
+
+function initApp(){
+  const saved = loadParticipantLocal();
+  if(saved && saved.nik){
+    renderWelcomeBack(saved);
+  } else {
+    renderStart();
+  }
 }
 
 if (initError) {
   app.innerHTML = `<span class="badge">Belum Terkoneksi</span><h2>Aplikasi belum terhubung ke Supabase</h2><p>${initError}</p>`;
 } else {
-  renderStart();
+  initApp();
 }
 </script>
 </body>
