@@ -40,6 +40,15 @@
     background:transparent; color:var(--ink); font-size:15px; margin-bottom:14px;
   }
   input[type=text]:focus{outline:2px solid var(--navy); border-color:var(--navy);}
+  select{
+    width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--card); color:var(--ink); font-size:15px; margin-bottom:14px;
+    font-family: Calibri, "Segoe UI", Arial, sans-serif; appearance:none;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%235B5F76" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+    background-repeat: no-repeat; background-position: right 14px center;
+  }
+  select:focus{outline:2px solid var(--navy); border-color:var(--navy);}
+  select:invalid{color:var(--ink-soft);}
   .save-note{font-size:13.5px; color:var(--ink-soft); margin:6px 0 14px;}
   .save-note.err{color:var(--red);}
   .save-note.ok{color:#2E8B57;}
@@ -275,7 +284,13 @@ function renderStart(){
     <p>Isi data di bawah untuk mulai. Sistem otomatis mengarahkan ke Pretest atau Posttest sesuai riwayatmu.</p>
     <input type="text" id="namaInput" placeholder="Nama *" value="${nama}">
     <input type="text" id="nikInput" placeholder="NIK *" value="${nik}">
-    <input type="text" id="divisiInput" placeholder="Divisi / Posisi *" value="${divisi}">
+    <select id="divisiInput" required>
+      <option value="" disabled ${divisi ? "" : "selected"}>Pilih Divisi / Posisi *</option>
+      <option value="Product Owner" ${divisi==="Product Owner"?"selected":""}>Product Owner</option>
+      <option value="Developer" ${divisi==="Developer"?"selected":""}>Developer</option>
+      <option value="QA" ${divisi==="QA"?"selected":""}>QA</option>
+      <option value="Project Manager" ${divisi==="Project Manager"?"selected":""}>Project Manager</option>
+    </select>
     <div class="save-note" id="startError" style="display:none;"></div>
     <button class="primary" id="startBtn">Lanjutkan</button>
   `;
