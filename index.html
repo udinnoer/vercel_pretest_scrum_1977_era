@@ -153,6 +153,24 @@ const QUESTIONS = [
          "Menentukan prioritas Product Backlog",
          "Menyetujui anggaran proyek"], correct:1,
    note:"Scrum Master adalah servant leader — memfasilitasi, bukan mengelola backlog atau menulis kode."},
+  {cat:"BRD & Product Backlog", q:"Dalam menyusun Business Requirement Document (BRD), kerangka apa yang dipakai untuk memastikan metric/KPI yang ditetapkan sudah tepat?",
+   opts:["SMART (Specific, Measurable, Achievable, Relevant, Time-bound)",
+         "SWOT (Strength, Weakness, Opportunity, Threat)",
+         "RACI (Responsible, Accountable, Consulted, Informed)",
+         "PDCA (Plan, Do, Check, Act)"], correct:0,
+   note:"Kerangka SMART dipakai untuk merumuskan metric/KPI BRD yang jelas dan terukur, mulai dari Business Objective hingga Baseline vs Target."},
+  {cat:"BRD & Product Backlog", q:"Kerangka DEEP dipakai untuk menilai ciri Product Backlog yang baik. Apa kepanjangan dari DEEP?",
+   opts:["Detailed appropriately, Emergent, Estimated, Prioritized",
+         "Defined, Executed, Evaluated, Planned",
+         "Detailed, Effective, Efficient, Practical",
+         "Developed, Engaged, Explained, Prepared"], correct:0,
+   note:"DEEP = Detailed appropriately, Emergent, Estimated, Prioritized — ciri Product Backlog yang sehat dan siap dikerjakan tim."},
+  {cat:"BRD & Product Backlog", q:"Manakah kriteria INVEST yang dipakai untuk menilai kualitas sebuah User Story?",
+   opts:["Independent, Negotiable, Valuable, Estimable, Small, Testable",
+         "Innovative, New, Verified, Efficient, Scalable, Testable",
+         "Integrated, Numbered, Verified, Estimated, Scoped, Timed",
+         "Iterative, Nimble, Value-driven, Efficient, Simple, Tracked"], correct:0,
+   note:"INVEST = Independent, Negotiable, Valuable, Estimable, Small, Testable — enam kriteria User Story yang baik dan siap masuk Sprint."},
   {cat:"Scrum Events", q:"Event yang dilakukan setiap hari, maksimal 15 menit, untuk sinkronisasi progress tim disebut?",
    opts:["Sprint Planning","Daily Scrum","Sprint Review","Sprint Retrospective"], correct:1,
    note:"Daily Scrum adalah sesi sinkronisasi harian berdurasi maksimal 15 menit."},
@@ -165,9 +183,6 @@ const QUESTIONS = [
          "Mengevaluasi cara kerja tim & merencanakan perbaikan proses",
          "Memecah Epic menjadi Task"], correct:2,
    note:"Retrospective fokus pada refleksi proses kerja tim, bukan hasil produk."},
-  {cat:"Scrum Events", q:"Pada Sprint Planning, siapa yang menentukan BAGAIMANA (how) pekerjaan akan diselesaikan?",
-   opts:["Product Owner","Scrum Master","Developers","Stakeholder"], correct:2,
-   note:"Developers yang merancang pendekatan teknis untuk menyelesaikan pekerjaan di Sprint."},
   {cat:"Waterfall & Scrum", q:"Pola \"Water-Scrum-Fall\" merujuk pada kondisi di mana?",
    opts:["Organisasi menjalankan Scrum murni tanpa jejak waterfall sama sekali",
          "Organisasi menerapkan Scrum di tengah proses, tapi tetap waterfall di tahap requirement awal & deployment/release akhir",
@@ -179,16 +194,7 @@ const QUESTIONS = [
          "Product Backlog berisi beberapa Epic, dan satu Epic dipecah menjadi beberapa Task",
          "Epic dan Task adalah istilah yang sama persis",
          "Sprint Goal adalah bagian dari sebuah Task"], correct:1,
-   note:"Alurnya: Product Backlog → berisi banyak Epic → satu Epic dipecah jadi beberapa Task."},
-  {cat:"Bekal Praktik", q:"Skala yang umum dipakai untuk Story Point saat Planning Poker adalah?",
-   opts:["Skala Fibonacci (1, 2, 3, 5, 8, ...)","Skala 1-100","Skala huruf A-F","Skala persentase"], correct:0,
-   note:"Skala Fibonacci dipakai karena selisih antar angka merepresentasikan ketidakpastian estimasi yang membesar."},
-  {cat:"Bekal Praktik", q:"Pada board retrospective ala EasyRetro, catatan di kolom \"To Improve\" dengan vote tertinggi biasanya diarahkan menjadi?",
-   opts:["Dihapus karena dianggap tidak penting",
-         "Action Item yang dibawa ke Sprint Backlog berikutnya dan dipantau lewat Daily Scrum",
-         "Epic baru yang langsung masuk Sprint Review",
-         "Sprint Goal untuk Sprint berikutnya"], correct:1,
-   note:"Catatan dengan vote tertinggi diarahkan jadi Action Item, lalu masuk Sprint Backlog dan dipantau via Daily Scrum."}
+   note:"Alurnya: Product Backlog → berisi banyak Epic → satu Epic dipecah jadi beberapa Task."}
 ];
 
 let nama = "", nik = "", divisi = "";
@@ -448,12 +454,15 @@ function renderResult(score, saved, note){
     <div>${catRows}</div>
     <div class="save-note ${saved?'ok':'err'}">${nextNote}</div>
     <div class="actions">
-      <button class="ghost" id="reviewBtn">Tinjau Jawaban</button>
+      ${mode==="post" ? `<button class="ghost" id="reviewBtn">Tinjau Jawaban</button>` : ""}
       <button class="primary" id="restartBtn">Kembali ke Awal</button>
     </div>
   `;
   document.getElementById("restartBtn").addEventListener("click", initApp);
-  document.getElementById("reviewBtn").addEventListener("click", renderReview);
+  const reviewBtn = document.getElementById("reviewBtn");
+  if(reviewBtn){
+    reviewBtn.addEventListener("click", renderReview);
+  }
 }
 
 function renderReview(){
