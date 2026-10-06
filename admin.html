@@ -84,6 +84,20 @@ if (localStorage.getItem("scrum_admin_auth") !== "1") {
   .status-pill{display:inline-block; font-size:11.5px; padding:3px 10px; border-radius:999px; border:1px solid var(--line); color:var(--ink-soft);}
   .status-pill.active{color:#2E8B57; border-color:#2E8B57; background:rgba(46,139,87,.08);}
 
+  textarea{
+    width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--card); color:var(--ink); font-size:15px; font-family: Calibri, "Segoe UI", Arial, sans-serif; resize:vertical;
+  }
+  textarea:focus{outline:2px solid var(--navy); border-color:var(--navy);}
+  .q-item{border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-top:12px; background:var(--paper);}
+  .q-item .q-cat{font-size:12px; color:var(--ink-soft);}
+  .q-item .q-text{font-weight:600; margin:4px 0 8px;}
+  .q-item ol{margin:0 0 8px; padding-left:22px; font-size:13.5px; color:var(--ink-soft);}
+  .q-item ol li.ok{color:#2E8B57; font-weight:700;}
+  .q-actions{display:flex; gap:8px; flex-wrap:wrap;}
+  .opt-row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+  .opt-row input[type=text]{flex:1;}
+
   #progress{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-top:16px;}
   .box{background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:18px 20px;}
   .box h3{margin:0 0 6px; font-size:14px; color:var(--ink);}
@@ -107,6 +121,8 @@ if (localStorage.getItem("scrum_admin_auth") !== "1") {
 
   <div class="panel" id="eventPanel">Memuat data event…</div>
 
+  <div class="panel" id="questionPanel">Memuat soal…</div>
+
   <div class="card" id="app">Memuat rekap peserta…</div>
 </div>
 
@@ -118,6 +134,10 @@ const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_D
 const app = document.getElementById("app");
 const eventPanel = document.getElementById("eventPanel");
 let events = [];
+let qEventId = null;     // event yang soalnya sedang diedit
+let qList = [];          // soal event terpilih
+let editingQ = null;     // null = tambah baru, objek = sedang edit
+const questionPanel = document.getElementById("questionPanel");
 let selectedEventId = "__all__"; // "__all__" | "__none__" (tanpa event) | <uuid>
 
 document.getElementById("logoutLink").addEventListener("click", (e)=>{
@@ -139,7 +159,12 @@ function csvEscape(v){
 async function loadEvents(){
   const { data, error } = await sb.from("events").select("*").order("start_date", { ascending:false });
   events = data || [];
+  if(!qEventId || !events.find(e=>e.id===qEventId)){
+    const act = events.find(e=>e.is_active) || events[0];
+    qEventId = act ? act.id : null;
+  }
   renderEventPanel();
+  loadQuestions();
   renderRecap();
 }
 
@@ -206,14 +231,28 @@ async function saveEvent(){
 
   const btn = document.getElementById("evSaveBtn");
   btn.disabled = true; btn.textContent = "Menyimpan…";
-  const { error } = await sb.from("events").insert({ title, speaker, start_date:start, end_date:end });
+  const { data: newEv, error } = await sb.from("events").insert({ title, speaker, start_date:start, end_date:end }).select("id").single();
   btn.disabled = false; btn.textContent = "Simpan Event";
 
-  if(error){
+  if(error || !newEv){
     errEl.textContent = "Gagal menyimpan event, coba lagi.";
     errEl.style.display = "block";
     return;
   }
+
+  // Salin soal dari event terbaru yang sudah punya soal
+  const { data: qOwners } = await sb.from("questions").select("event_id");
+  const ownerSet = new Set((qOwners||[]).map(r=>r.event_id));
+  const source = events.find(ev => ownerSet.has(ev.id));
+  if(source){
+    const { data: srcQs } = await sb.from("questions").select("*").eq("event_id", source.id).order("position",{ascending:true});
+    if(srcQs && srcQs.length){
+      await sb.from("questions").insert(srcQs.map(r=>({
+        event_id:newEv.id, position:r.position, cat:r.cat, q:r.q, opts:r.opts, correct:r.correct, note:r.note
+      })));
+    }
+  }
+  qEventId = newEv.id;
   await loadEvents();
 }
 
@@ -224,6 +263,128 @@ async function setActiveEvent(eventId){
     await sb.from("events").update({ is_active:true }).eq("id", eventId);
   }
   await loadEvents();
+}
+
+function esc(v){
+  return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+async function loadQuestions(){
+  if(!qEventId){ qList = []; renderQuestionPanel(); return; }
+  const { data } = await sb.from("questions").select("*").eq("event_id", qEventId).order("position",{ascending:true});
+  qList = data || [];
+  renderQuestionPanel();
+}
+
+function renderQuestionPanel(){
+  if(!events.length){
+    questionPanel.innerHTML = `<span class="badge">Soal Event</span><h2>Soal Pretest/Posttest</h2><p>Buat event dulu, lalu soal bisa dikelola di sini.</p>`;
+    return;
+  }
+  const evOptions = events.map(ev=>`<option value="${ev.id}" ${ev.id===qEventId?"selected":""}>${esc(ev.title)}${ev.is_active?" (Aktif)":""}</option>`).join("");
+  const e = editingQ || {cat:"", q:"", opts:["","","",""], correct:0, note:""};
+  const optRows = [0,1,2,3].map(i=>`
+    <div class="opt-row">
+      <input type="radio" name="qCorrect" value="${i}" ${e.correct===i?"checked":""} title="Jawaban benar">
+      <input type="text" class="qOpt" placeholder="Opsi ${"ABCD"[i]}" value="${esc(e.opts[i]||"")}">
+    </div>`).join("");
+
+  const items = qList.map((q,i)=>`
+    <div class="q-item">
+      <div class="q-cat">#${i+1} · ${esc(q.cat)}</div>
+      <div class="q-text">${esc(q.q)}</div>
+      <ol type="A">${(q.opts||[]).map((o,oi)=>`<li class="${oi===q.correct?"ok":""}">${esc(o)}</li>`).join("")}</ol>
+      <div class="q-actions">
+        <button class="ghost small" data-up="${q.id}" ${i===0?"disabled":""}>↑</button>
+        <button class="ghost small" data-down="${q.id}" ${i===qList.length-1?"disabled":""}>↓</button>
+        <button class="ghost small" data-edit="${q.id}">Ubah</button>
+        <button class="ghost small" data-del="${q.id}">Hapus</button>
+      </div>
+    </div>`).join("");
+
+  questionPanel.innerHTML = `
+    <span class="badge">Soal Event</span>
+    <h2>Soal Pretest/Posttest</h2>
+    <p>Soal disimpan per event dan dipakai untuk Pretest maupun Posttest. Hindari mengubah/menghapus soal setelah ada peserta yang mengerjakan, karena hasil per-soal di Dashboard bisa tidak sesuai.</p>
+    <div class="form-grid" style="max-width:420px;"><div><label>Event:</label><select id="qEventSel">${evOptions}</select></div></div>
+    <h3 style="margin-top:8px;">${editingQ ? "Ubah Soal" : "Tambah Soal"}</h3>
+    <div class="form-grid" style="grid-template-columns:1fr;">
+      <div><label>Kategori *</label><input type="text" id="qCat" value="${esc(e.cat)}" placeholder="mis. Scrum Events"></div>
+      <div><label>Pertanyaan *</label><textarea id="qText" rows="2">${esc(e.q)}</textarea></div>
+      <div><label>Pilihan jawaban * (pilih bulatan untuk jawaban yang benar)</label>${optRows}</div>
+      <div><label>Pembahasan (ditampilkan di Tinjau Jawaban Posttest)</label><textarea id="qNote" rows="2">${esc(e.note)}</textarea></div>
+    </div>
+    <div class="save-note err" id="qError" style="display:none;"></div>
+    <div class="q-actions">
+      <button class="primary" id="qSaveBtn">${editingQ ? "Simpan Perubahan" : "Tambah Soal"}</button>
+      ${editingQ ? `<button class="ghost" id="qCancelBtn">Batal</button>` : ""}
+    </div>
+    <h3 style="margin-top:26px;">Daftar Soal (${qList.length})</h3>
+    ${qList.length ? items : `<p>Event ini belum punya soal.</p>`}
+  `;
+
+  document.getElementById("qEventSel").addEventListener("change", (ev)=>{ qEventId = ev.target.value; editingQ = null; loadQuestions(); });
+  document.getElementById("qSaveBtn").addEventListener("click", saveQuestion);
+  const cancel = document.getElementById("qCancelBtn");
+  if(cancel) cancel.addEventListener("click", ()=>{ editingQ = null; renderQuestionPanel(); });
+  questionPanel.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", ()=>{
+    editingQ = qList.find(q=>q.id===b.getAttribute("data-edit")); renderQuestionPanel();
+    questionPanel.scrollIntoView({behavior:"smooth"});
+  }));
+  questionPanel.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click", ()=> deleteQuestion(b.getAttribute("data-del"))));
+  questionPanel.querySelectorAll("[data-up]").forEach(b=>b.addEventListener("click", ()=> moveQuestion(b.getAttribute("data-up"), -1)));
+  questionPanel.querySelectorAll("[data-down]").forEach(b=>b.addEventListener("click", ()=> moveQuestion(b.getAttribute("data-down"), 1)));
+}
+
+async function saveQuestion(){
+  const errEl = document.getElementById("qError");
+  errEl.style.display = "none";
+  const cat = document.getElementById("qCat").value.trim();
+  const q = document.getElementById("qText").value.trim();
+  const opts = [...document.querySelectorAll(".qOpt")].map(i=>i.value.trim());
+  const note = document.getElementById("qNote").value.trim();
+  const checked = document.querySelector("input[name=qCorrect]:checked");
+  const correct = checked ? parseInt(checked.value,10) : 0;
+
+  if(!cat || !q || opts.some(o=>!o)){
+    errEl.textContent = "Kategori, pertanyaan, dan keempat pilihan jawaban wajib diisi.";
+    errEl.style.display = "block";
+    return;
+  }
+  const btn = document.getElementById("qSaveBtn");
+  btn.disabled = true;
+  let error;
+  if(editingQ){
+    ({ error } = await sb.from("questions").update({ cat, q, opts, correct, note }).eq("id", editingQ.id));
+  } else {
+    const position = qList.length ? Math.max(...qList.map(x=>x.position)) + 1 : 1;
+    ({ error } = await sb.from("questions").insert({ event_id:qEventId, position, cat, q, opts, correct, note }));
+  }
+  if(error){
+    btn.disabled = false;
+    errEl.textContent = "Gagal menyimpan soal, coba lagi.";
+    errEl.style.display = "block";
+    return;
+  }
+  editingQ = null;
+  await loadQuestions();
+}
+
+async function deleteQuestion(id){
+  if(!confirm("Hapus soal ini? Tindakan ini tidak bisa dibatalkan.")) return;
+  await sb.from("questions").delete().eq("id", id);
+  if(editingQ && editingQ.id === id) editingQ = null;
+  await loadQuestions();
+}
+
+async function moveQuestion(id, dir){
+  const i = qList.findIndex(q=>q.id===id);
+  const j = i + dir;
+  if(i < 0 || j < 0 || j >= qList.length) return;
+  const a = qList[i], b = qList[j];
+  await sb.from("questions").update({ position:b.position }).eq("id", a.id);
+  await sb.from("questions").update({ position:a.position }).eq("id", b.id);
+  await loadQuestions();
 }
 
 async function renderRecap(){
@@ -362,6 +523,7 @@ function exportCsv(rows){
 
 if(!sb){
   eventPanel.style.display = "none";
+  questionPanel.style.display = "none";
   app.innerHTML = `<span class="badge">Konfigurasi Tidak Ditemukan</span><h2>Tidak dapat terhubung ke database</h2><p>Periksa variabel SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js.</p>`;
 } else {
   loadEvents();

@@ -118,23 +118,7 @@ function fmtDate(d){
   return dt.toLocaleDateString("id-ID", {day:"numeric", month:"short", year:"numeric"});
 }
 
-const QUESTIONS = [
-  {cat:"Fondasi Agile", q:"Agile Manifesto lahir dari diskusi 17 praktisi software pada tahun berapa?"},
-  {cat:"Fondasi Agile", q:"Manakah pernyataan berikut yang justru BERTENTANGAN dengan nilai inti Agile Manifesto?"},
-  {cat:"Mengenal Scrum", q:"Kenapa Scrum dianggap cocok untuk pengembangan software?"},
-  {cat:"Mengenal Scrum", q:"Ada berapa pilar (pillars) dalam Scrum?"},
-  {cat:"Mengenal Scrum", q:"Berikut ini termasuk nilai (values) Scrum, KECUALI:"},
-  {cat:"Scrum Actors", q:"Siapa yang bertanggung jawab memaksimalkan nilai produk dan mengelola Product Backlog?"},
-  {cat:"Scrum Actors", q:"Apa peran utama Scrum Master dalam tim?"},
-  {cat:"BRD & Product Backlog", q:"Dalam menyusun Business Requirement Document (BRD), kerangka apa yang dipakai untuk memastikan metric/KPI yang ditetapkan sudah tepat?"},
-  {cat:"BRD & Product Backlog", q:"Kerangka DEEP dipakai untuk menilai ciri Product Backlog yang baik. Apa kepanjangan dari DEEP?"},
-  {cat:"BRD & Product Backlog", q:"Manakah kriteria INVEST yang dipakai untuk menilai kualitas sebuah User Story?"},
-  {cat:"Scrum Events", q:"Event yang dilakukan setiap hari, maksimal 15 menit, untuk sinkronisasi progress tim disebut?"},
-  {cat:"Scrum Events", q:"Pada event apa tim mendemonstrasikan increment (hasil kerja) kepada stakeholder?"},
-  {cat:"Scrum Events", q:"Apa tujuan utama Sprint Retrospective?"},
-  {cat:"Waterfall & Scrum", q:"Pola \"Water-Scrum-Fall\" merujuk pada kondisi di mana?"},
-  {cat:"Bekal Praktik", q:"Dalam hierarki Product Backlog, hubungan yang benar adalah?"}
-];
+let QUESTIONS = []; // dimuat dari tabel questions untuk event terpilih
 
 let events = [];
 let selectedEventId = null; // "__none__" | <uuid>
@@ -196,6 +180,18 @@ async function refreshData(){
 
   const { data:sessions } = await sessionsQuery;
   const { data:results } = await resultsQuery;
+
+  if(selectedEventId !== "__none__"){
+    const { data: qs } = await sb.from("questions").select("cat,q").eq("event_id", selectedEventId).order("position", { ascending:true });
+    QUESTIONS = qs || [];
+  } else {
+    QUESTIONS = [];
+  }
+  // Data tanpa event / event tanpa soal: pakai jumlah jawaban tersimpan sebagai jumlah soal
+  if(results && !QUESTIONS.length){
+    const n = Math.max(0, ...results.map(r => (r.answers||[]).length));
+    QUESTIONS = Array.from({length:n}, (_,i)=>({cat:"Soal", q:""}));
+  }
 
   if(!sessions || !results){
     app.innerHTML = `<div class="panel">Gagal memuat data, coba muat ulang halaman ini.</div>`;

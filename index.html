@@ -123,84 +123,11 @@ let mode = "pre";
 let sessionId = null;
 let activeEvent = null; // {id, title, speaker, start_date, end_date}
 
-const QUESTIONS = [
-  {cat:"Fondasi Agile", q:"Agile Manifesto lahir dari diskusi 17 praktisi software pada tahun berapa?",
-   opts:["1999","2001","2005","2010"], correct:1,
-   note:"Agile Manifesto disepakati tahun 2001 oleh 17 praktisi software."},
-  {cat:"Fondasi Agile", q:"Manakah pernyataan berikut yang justru BERTENTANGAN dengan nilai inti Agile Manifesto?",
-   opts:["Individu dan interaksi lebih diutamakan daripada proses dan tools",
-         "Working software lebih diutamakan daripada dokumentasi lengkap",
-         "Mengikuti rencana lebih diutamakan daripada merespons perubahan",
-         "Kolaborasi dengan pelanggan lebih diutamakan daripada negosiasi kontrak"], correct:2,
-   note:"Nilai aslinya justru sebaliknya: merespons perubahan lebih diutamakan daripada mengikuti rencana."},
-  {cat:"Mengenal Scrum", q:"Kenapa Scrum dianggap cocok untuk pengembangan software?",
-   opts:["Karena semua requirement bisa didefinisikan lengkap di awal",
-         "Karena kompleksitas & ketidakpastian teknis produk digital tinggi sehingga perlu iterasi",
-         "Karena tim boleh bekerja tanpa koordinasi",
-         "Karena tidak butuh feedback dari user"], correct:1,
-   note:"Scrum dirancang untuk menangani kompleksitas & ketidakpastian teknis lewat siklus iteratif."},
-  {cat:"Mengenal Scrum", q:"Ada berapa pilar (pillars) dalam Scrum?",
-   opts:["2","3","4","5"], correct:1,
-   note:"Tiga pilar Scrum: Transparency, Inspection, Adaptation."},
-  {cat:"Mengenal Scrum", q:"Berikut ini termasuk nilai (values) Scrum, KECUALI:",
-   opts:["Commitment","Courage","Focus","Efficiency"], correct:3,
-   note:"Lima nilai Scrum: Commitment, Courage, Focus, Openness, Respect — Efficiency bukan salah satunya."},
-  {cat:"Scrum Actors", q:"Siapa yang bertanggung jawab memaksimalkan nilai produk dan mengelola Product Backlog?",
-   opts:["Scrum Master","Product Owner","Developers","Stakeholder"], correct:1,
-   note:"Product Owner memegang akuntabilitas atas Product Backlog dan nilai produk."},
-  {cat:"Scrum Actors", q:"Apa peran utama Scrum Master dalam tim?",
-   opts:["Menulis kode aplikasi",
-         "Menjadi servant leader yang memastikan tim memahami & menjalankan Scrum dengan baik",
-         "Menentukan prioritas Product Backlog",
-         "Menyetujui anggaran proyek"], correct:1,
-   note:"Scrum Master adalah servant leader — memfasilitasi, bukan mengelola backlog atau menulis kode."},
-  {cat:"BRD & Product Backlog", q:"Dalam menyusun Business Requirement Document (BRD), kerangka apa yang dipakai untuk memastikan metric/KPI yang ditetapkan sudah tepat?",
-   opts:["SMART (Specific, Measurable, Achievable, Relevant, Time-bound)",
-         "SWOT (Strength, Weakness, Opportunity, Threat)",
-         "RACI (Responsible, Accountable, Consulted, Informed)",
-         "PDCA (Plan, Do, Check, Act)"], correct:0,
-   note:"Kerangka SMART dipakai untuk merumuskan metric/KPI BRD yang jelas dan terukur, mulai dari Business Objective hingga Baseline vs Target."},
-  {cat:"BRD & Product Backlog", q:"Kerangka DEEP dipakai untuk menilai ciri Product Backlog yang baik. Apa kepanjangan dari DEEP?",
-   opts:["Detailed appropriately, Emergent, Estimated, Prioritized",
-         "Defined, Executed, Evaluated, Planned",
-         "Detailed, Effective, Efficient, Practical",
-         "Developed, Engaged, Explained, Prepared"], correct:0,
-   note:"DEEP = Detailed appropriately, Emergent, Estimated, Prioritized — ciri Product Backlog yang sehat dan siap dikerjakan tim."},
-  {cat:"BRD & Product Backlog", q:"Manakah kriteria INVEST yang dipakai untuk menilai kualitas sebuah User Story?",
-   opts:["Independent, Negotiable, Valuable, Estimable, Small, Testable",
-         "Innovative, New, Verified, Efficient, Scalable, Testable",
-         "Integrated, Numbered, Verified, Estimated, Scoped, Timed",
-         "Iterative, Nimble, Value-driven, Efficient, Simple, Tracked"], correct:0,
-   note:"INVEST = Independent, Negotiable, Valuable, Estimable, Small, Testable — enam kriteria User Story yang baik dan siap masuk Sprint."},
-  {cat:"Scrum Events", q:"Event yang dilakukan setiap hari, maksimal 15 menit, untuk sinkronisasi progress tim disebut?",
-   opts:["Sprint Planning","Daily Scrum","Sprint Review","Sprint Retrospective"], correct:1,
-   note:"Daily Scrum adalah sesi sinkronisasi harian berdurasi maksimal 15 menit."},
-  {cat:"Scrum Events", q:"Pada event apa tim mendemonstrasikan increment (hasil kerja) kepada stakeholder?",
-   opts:["Sprint Planning","Daily Scrum","Sprint Review","Sprint Retrospective"], correct:2,
-   note:"Sprint Review adalah forum untuk mendemokan increment ke stakeholder dan mengumpulkan feedback."},
-  {cat:"Scrum Events", q:"Apa tujuan utama Sprint Retrospective?",
-   opts:["Menentukan Sprint Goal",
-         "Mendemo produk ke stakeholder",
-         "Mengevaluasi cara kerja tim & merencanakan perbaikan proses",
-         "Memecah Epic menjadi Task"], correct:2,
-   note:"Retrospective fokus pada refleksi proses kerja tim, bukan hasil produk."},
-  {cat:"Waterfall & Scrum", q:"Pola \"Water-Scrum-Fall\" merujuk pada kondisi di mana?",
-   opts:["Organisasi menjalankan Scrum murni tanpa jejak waterfall sama sekali",
-         "Organisasi menerapkan Scrum di tengah proses, tapi tetap waterfall di tahap requirement awal & deployment/release akhir",
-         "Waterfall diubah total menjadi Scrum penuh",
-         "Scrum dijalankan tanpa konsep Sprint"], correct:1,
-   note:"Water-Scrum-Fall menggambarkan hybrid: Scrum hanya diterapkan di bagian tengah siklus proyek."},
-  {cat:"Bekal Praktik", q:"Dalam hierarki Product Backlog, hubungan yang benar adalah?",
-   opts:["Task berisi banyak Epic",
-         "Product Backlog berisi beberapa Epic, dan satu Epic dipecah menjadi beberapa Task",
-         "Epic dan Task adalah istilah yang sama persis",
-         "Sprint Goal adalah bagian dari sebuah Task"], correct:1,
-   note:"Alurnya: Product Backlog → berisi banyak Epic → satu Epic dipecah jadi beberapa Task."}
-];
+let QUESTIONS = []; // dimuat dari tabel questions sesuai event aktif
 
 let nama = "", nik = "", divisi = "";
 let idx = 0;
-let answers = new Array(QUESTIONS.length).fill(null);
+let answers = [];
 const app = document.getElementById("app");
 
 const LOCAL_KEY = "scrum_participant_v1";
@@ -240,6 +167,10 @@ async function loadActiveEvent(){
   if(sub){
     sub.textContent = `${activeEvent.title} — ${activeEvent.speaker}`;
   }
+  const { data: qs, error: qErr } = await sb.from("questions").select("*")
+    .eq("event_id", activeEvent.id).order("position", { ascending:true });
+  QUESTIONS = qErr ? [] : (qs || []).map(r => ({ cat:r.cat, q:r.q, opts:r.opts, correct:r.correct, note:r.note }));
+  answers = new Array(QUESTIONS.length).fill(null);
 }
 
 function renderNoActiveEvent(){
@@ -517,6 +448,10 @@ async function initApp(){
   await loadActiveEvent();
   if(!activeEvent){
     renderNoActiveEvent();
+    return;
+  }
+  if(!QUESTIONS.length){
+    app.innerHTML = `<span class="badge">Soal Belum Tersedia</span><h2>Soal belum disiapkan</h2><p>Event ini belum memiliki soal. Hubungi admin/panitia training.</p>`;
     return;
   }
   const saved = loadParticipantLocal();
