@@ -95,8 +95,15 @@ if (localStorage.getItem("scrum_admin_auth") !== "1") {
   .q-item ol{margin:0 0 8px; padding-left:22px; font-size:13.5px; color:var(--ink-soft);}
   .q-item ol li.ok{color:#2E8B57; font-weight:700;}
   .q-actions{display:flex; gap:8px; flex-wrap:wrap;}
-  .opt-row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
-  .opt-row input[type=text]{flex:1;}
+  .opt-row{display:flex; gap:12px; align-items:center; margin-bottom:10px;}
+  .opt-row .opt-letter{flex:none; width:26px; font-weight:700; color:var(--navy);}
+  .opt-row input[type=radio]{flex:none; width:20px; height:20px; margin:0; accent-color:var(--navy);}
+  .opt-row input[type=text]{flex:1; width:100%; min-width:0;}
+  .q-group{border:1px solid var(--line); border-radius:14px; margin-top:14px; background:var(--card);}
+  .q-group>summary{cursor:pointer; padding:14px 18px; font-family:Cambria,Georgia,serif; font-weight:700; display:flex; justify-content:space-between; align-items:center; gap:10px; list-style:none;}
+  .q-group>summary::-webkit-details-marker{display:none;}
+  .q-group>summary small{font-family:Calibri,sans-serif; font-weight:400; color:var(--ink-soft);}
+  .q-group .q-group-body{padding:0 18px 16px;}
 
   #progress{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-top:16px;}
   .box{background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:18px 20px;}
@@ -135,6 +142,7 @@ const app = document.getElementById("app");
 const eventPanel = document.getElementById("eventPanel");
 let events = [];
 let qEventId = null;     // event yang soalnya sedang diedit
+let qAll = [];           // semua soal (semua event)
 let qList = [];          // soal event terpilih
 let editingQ = null;     // null = tambah baru, objek = sedang edit
 const questionPanel = document.getElementById("questionPanel");
@@ -270,9 +278,9 @@ function esc(v){
 }
 
 async function loadQuestions(){
-  if(!qEventId){ qList = []; renderQuestionPanel(); return; }
-  const { data } = await sb.from("questions").select("*").eq("event_id", qEventId).order("position",{ascending:true});
-  qList = data || [];
+  const { data } = await sb.from("questions").select("*").order("position",{ascending:true});
+  qAll = data || [];
+  qList = qAll.filter(q=>q.event_id===qEventId);
   renderQuestionPanel();
 }
 
@@ -285,22 +293,35 @@ function renderQuestionPanel(){
   const e = editingQ || {cat:"", q:"", opts:["","","",""], correct:0, note:""};
   const optRows = [0,1,2,3].map(i=>`
     <div class="opt-row">
+      <span class="opt-letter">${"ABCD"[i]}.</span>
       <input type="radio" name="qCorrect" value="${i}" ${e.correct===i?"checked":""} title="Jawaban benar">
-      <input type="text" class="qOpt" placeholder="Opsi ${"ABCD"[i]}" value="${esc(e.opts[i]||"")}">
+      <input type="text" class="qOpt" placeholder="Isi pilihan ${"ABCD"[i]}" value="${esc(e.opts[i]||"")}">
     </div>`).join("");
 
-  const items = qList.map((q,i)=>`
+  const itemsFor = (list)=> list.map((q,i)=>`
     <div class="q-item">
       <div class="q-cat">#${i+1} · ${esc(q.cat)}</div>
       <div class="q-text">${esc(q.q)}</div>
       <ol type="A">${(q.opts||[]).map((o,oi)=>`<li class="${oi===q.correct?"ok":""}">${esc(o)}</li>`).join("")}</ol>
       <div class="q-actions">
         <button class="ghost small" data-up="${q.id}" ${i===0?"disabled":""}>↑</button>
-        <button class="ghost small" data-down="${q.id}" ${i===qList.length-1?"disabled":""}>↓</button>
+        <button class="ghost small" data-down="${q.id}" ${i===list.length-1?"disabled":""}>↓</button>
         <button class="ghost small" data-edit="${q.id}">Ubah</button>
         <button class="ghost small" data-del="${q.id}">Hapus</button>
       </div>
     </div>`).join("");
+
+  const groups = events.map(ev=>{
+    const list = qAll.filter(q=>q.event_id===ev.id);
+    return `
+    <details class="q-group" ${ev.id===qEventId?"open":""} data-group="${ev.id}">
+      <summary><span>${esc(ev.title)}${ev.is_active?" (Aktif)":""} <small>· ${fmtDate(ev.start_date)}</small></span><small>${list.length} soal</small></summary>
+      <div class="q-group-body">
+        <div class="q-actions" style="margin-top:4px;"><button class="ghost small" data-addto="${ev.id}">+ Tambah soal ke event ini</button></div>
+        ${list.length ? itemsFor(list) : `<p>Event ini belum punya soal.</p>`}
+      </div>
+    </details>`;
+  }).join("");
 
   questionPanel.innerHTML = `
     <span class="badge">Soal Event</span>
@@ -319,16 +340,24 @@ function renderQuestionPanel(){
       <button class="primary" id="qSaveBtn">${editingQ ? "Simpan Perubahan" : "Tambah Soal"}</button>
       ${editingQ ? `<button class="ghost" id="qCancelBtn">Batal</button>` : ""}
     </div>
-    <h3 style="margin-top:26px;">Daftar Soal (${qList.length})</h3>
-    ${qList.length ? items : `<p>Event ini belum punya soal.</p>`}
+    <h3 style="margin-top:26px;">Daftar Soal per Event</h3>
+    ${groups}
   `;
 
   document.getElementById("qEventSel").addEventListener("change", (ev)=>{ qEventId = ev.target.value; editingQ = null; loadQuestions(); });
   document.getElementById("qSaveBtn").addEventListener("click", saveQuestion);
   const cancel = document.getElementById("qCancelBtn");
   if(cancel) cancel.addEventListener("click", ()=>{ editingQ = null; renderQuestionPanel(); });
+  questionPanel.querySelectorAll("[data-addto]").forEach(b=>b.addEventListener("click", ()=>{
+    qEventId = b.getAttribute("data-addto"); editingQ = null;
+    qList = qAll.filter(q=>q.event_id===qEventId);
+    renderQuestionPanel();
+    document.getElementById("qCat").scrollIntoView({behavior:"smooth", block:"center"});
+  }));
   questionPanel.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", ()=>{
-    editingQ = qList.find(q=>q.id===b.getAttribute("data-edit")); renderQuestionPanel();
+    editingQ = qAll.find(q=>q.id===b.getAttribute("data-edit"));
+    if(editingQ){ qEventId = editingQ.event_id; qList = qAll.filter(q=>q.event_id===qEventId); }
+    renderQuestionPanel();
     questionPanel.scrollIntoView({behavior:"smooth"});
   }));
   questionPanel.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click", ()=> deleteQuestion(b.getAttribute("data-del"))));
@@ -378,10 +407,13 @@ async function deleteQuestion(id){
 }
 
 async function moveQuestion(id, dir){
-  const i = qList.findIndex(q=>q.id===id);
+  const target = qAll.find(q=>q.id===id);
+  if(!target) return;
+  const list = qAll.filter(q=>q.event_id===target.event_id);
+  const i = list.findIndex(q=>q.id===id);
   const j = i + dir;
-  if(i < 0 || j < 0 || j >= qList.length) return;
-  const a = qList[i], b = qList[j];
+  if(i < 0 || j < 0 || j >= list.length) return;
+  const a = list[i], b = list[j];
   await sb.from("questions").update({ position:b.position }).eq("id", a.id);
   await sb.from("questions").update({ position:a.position }).eq("id", b.id);
   await loadQuestions();
