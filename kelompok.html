@@ -4,8 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kelompok — Training Scrum Master</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script>
+if (localStorage.getItem("scrum_admin_auth") !== "1") {
+  location.href = "login.html?redirect=" + encodeURIComponent(location.pathname.split("/").pop() || "kelompok.html");
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --navy:#283990; --red:#E23633; --paper:#F6F5F2; --card:#FFFFFF;
@@ -43,6 +48,12 @@
     background:transparent; color:var(--ink); font-size:15px; width:120px;
   }
   input[type=number]:focus{outline:2px solid var(--navy); border-color:var(--navy);}
+  select{
+    padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--card); color:var(--ink); font-size:15px;
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  }
+  select:focus{outline:2px solid var(--navy); border-color:var(--navy);}
   button.primary{
     padding:12px 20px; border:none; border-radius:12px; background:var(--red);
     color:#fff; font-size:15px; font-weight:700; cursor:pointer;
@@ -87,11 +98,11 @@
   <div class="top">
     <div class="mark">SM</div>
     <div>
-      <div style="font-size:14px;font-weight:700;">Pembentukan Kelompok <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kuis</a> <a href="admin.html" class="link-btn" style="margin-left:6px;font-size:12px;">Rekap</a> <a href="dashboard.html" class="link-btn" style="margin-left:6px;font-size:12px;">Dashboard</a></div>
+      <div style="font-size:14px;font-weight:700;">Pembentukan Kelompok <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kuis</a> <a href="admin.html" class="link-btn" style="margin-left:6px;font-size:12px;">Rekap</a> <a href="dashboard.html" class="link-btn" style="margin-left:6px;font-size:12px;">Dashboard</a> <a href="#" id="logoutLink" class="link-btn" style="margin-left:6px;font-size:12px;">Logout</a></div>
       <small>Training Scrum Master — Tim IT</small>
     </div>
   </div>
-  <div id="app" class="panel">Memuat data peserta…</div>
+  <div id="app" class="panel">Memuat daftar event…</div>
 </div>
 
 <script>
@@ -100,8 +111,22 @@ const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_D
   : null;
 
 const app = document.getElementById("app");
-let participants = [];   // roster dari pretest (nik unik)
+let events = [];
+let selectedEventId = null; // "__none__" | <uuid>
+let participants = [];   // roster dari pretest (nik unik), untuk event terpilih
 let currentGroups = null; // hasil generate terakhir (preview, belum tentu tersimpan)
+
+document.getElementById("logoutLink").addEventListener("click", (e)=>{
+  e.preventDefault();
+  localStorage.removeItem("scrum_admin_auth");
+  location.href = "login.html";
+});
+
+function fmtDate(d){
+  if(!d) return "";
+  const dt = new Date(d + "T00:00:00");
+  return dt.toLocaleDateString("id-ID", {day:"numeric", month:"short", year:"numeric"});
+}
 
 // Fisher-Yates shuffle
 function shuffle(arr){
@@ -133,9 +158,48 @@ function buildGroups(people, n){
   return groups;
 }
 
+async function loadEvents(){
+  const { data } = await sb.from("events").select("*").order("start_date", { ascending:false });
+  events = data || [];
+  renderEventPicker();
+}
+
+function renderEventPicker(){
+  const activeEvent = events.find(e=>e.is_active);
+  const options = `
+    ${events.map(ev=>`<option value="${ev.id}">${ev.title}${ev.is_active?" (Aktif)":""} — ${fmtDate(ev.start_date)}</option>`).join("")}
+    <option value="__none__">Data Tanpa Event (sebelum fitur event)</option>
+  `;
+  app.innerHTML = `
+    <span class="badge">Pilih Event</span>
+    <h2>Bentuk kelompok untuk event mana?</h2>
+    <p>${events.length ? "Peserta diambil dari yang sudah mengisi Pretest pada event terpilih." : "Belum ada event terdaftar — buat dulu di halaman Rekap Peserta."}</p>
+    ${events.length ? `
+      <div class="form-row">
+        <select id="eventPicker">${options}</select>
+        <button class="primary" id="showBtn">Pilih</button>
+      </div>
+    ` : `<a href="admin.html" class="link-btn">Buka Halaman Rekap Peserta</a>`}
+  `;
+  if(events.length){
+    if(activeEvent){
+      document.getElementById("eventPicker").value = activeEvent.id;
+    }
+    document.getElementById("showBtn").addEventListener("click", ()=>{
+      selectedEventId = document.getElementById("eventPicker").value;
+      loadParticipants();
+    });
+  }
+}
+
 async function loadParticipants(){
+  const selectedEvent = events.find(e=>e.id===selectedEventId);
+  const eventLabel = selectedEvent ? selectedEvent.title : "Data Tanpa Event";
+
   app.innerHTML = `<h2>Memuat data peserta…</h2>`;
-  const { data, error } = await sb.from("results").select("nik,nama,divisi").eq("mode","pre").order("created_at",{ascending:true});
+  let query = sb.from("results").select("nik,nama,divisi").eq("mode","pre").order("created_at",{ascending:true});
+  query = selectedEventId === "__none__" ? query.is("event_id", null) : query.eq("event_id", selectedEventId);
+  const { data, error } = await query;
   if(error){
     app.innerHTML = `<span class="badge">Gagal Memuat</span><h2>Tidak bisa mengambil data peserta</h2><p>Coba muat ulang halaman ini.</p>`;
     return;
@@ -147,17 +211,21 @@ async function loadParticipants(){
     seen.add(p.nik); return true;
   });
 
-  const { data: savedGroups } = await sb.from("groups").select("*").order("group_no",{ascending:true});
+  let groupsQuery = sb.from("groups").select("*").order("group_no",{ascending:true});
+  groupsQuery = selectedEventId === "__none__" ? groupsQuery.is("event_id", null) : groupsQuery.eq("event_id", selectedEventId);
+  const { data: savedGroups } = await groupsQuery;
 
-  renderForm(savedGroups && savedGroups.length ? savedGroups : null);
+  renderForm(savedGroups && savedGroups.length ? savedGroups : null, eventLabel);
 }
 
-function renderForm(savedGroups){
+function renderForm(savedGroups, eventLabel){
   const divisiSet = [...new Set(participants.map(p=>p.divisi))];
   app.innerHTML = `
-    <span class="badge">${participants.length} Peserta Terdaftar (dari Pretest)</span>
-    <h2>Bentuk Kelompok Training</h2>
-    <p>Peserta akan dibagi rata ke beberapa kelompok, dengan divisi disebar sebisa mungkin merata di tiap kelompok (bukan random murni). Data diambil dari peserta yang sudah mengisi Pretest — total ${divisiSet.length} divisi berbeda.</p>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+      <div><span class="badge">${eventLabel}</span><h2 style="margin:4px 0 0;">${participants.length} Peserta Terdaftar (dari Pretest)</h2></div>
+      <button class="ghost" id="changeEventBtn">Ganti Event</button>
+    </div>
+    <p>Peserta akan dibagi rata ke beberapa kelompok, dengan divisi disebar sebisa mungkin merata di tiap kelompok (bukan random murni). Total ${divisiSet.length} divisi berbeda.</p>
     <div class="form-row">
       <label for="numGroups">Jumlah kelompok:</label>
       <input type="number" id="numGroups" min="2" max="${Math.max(2,participants.length)}" value="4">
@@ -166,6 +234,7 @@ function renderForm(savedGroups){
     <div class="save-note" id="formError" style="display:none;"></div>
     <div id="result"></div>
   `;
+  document.getElementById("changeEventBtn").addEventListener("click", renderEventPicker);
   document.getElementById("generateBtn").addEventListener("click", onGenerate);
 
   if(savedGroups){
@@ -185,7 +254,7 @@ function onGenerate(){
     return;
   }
   if(participants.length === 0){
-    errEl.textContent = "Belum ada peserta yang mengisi Pretest.";
+    errEl.textContent = "Belum ada peserta yang mengisi Pretest untuk event ini.";
     errEl.style.display = "block";
     return;
   }
@@ -260,12 +329,16 @@ async function saveGroups(){
   const saveBtn = document.getElementById("saveBtn");
   saveBtn.disabled = true; saveBtn.textContent = "Menyimpan…";
 
-  await sb.from("groups").delete().neq("id","00000000-0000-0000-0000-000000000000"); // hapus semua kelompok lama
+  // Hapus kelompok lama HANYA untuk event yang sedang dipilih
+  let delQuery = sb.from("groups").delete();
+  delQuery = selectedEventId === "__none__" ? delQuery.is("event_id", null) : delQuery.eq("event_id", selectedEventId);
+  await delQuery;
 
+  const eventIdValue = selectedEventId === "__none__" ? null : selectedEventId;
   const rows = [];
   currentGroups.forEach((g,i)=>{
     g.forEach(p=>{
-      rows.push({ nik:p.nik, nama:p.nama, divisi:p.divisi, group_no:i+1 });
+      rows.push({ nik:p.nik, nama:p.nama, divisi:p.divisi, group_no:i+1, event_id: eventIdValue });
     });
   });
 
@@ -283,7 +356,7 @@ async function saveGroups(){
 if(!sb){
   app.innerHTML = `<span class="badge">Konfigurasi Tidak Ditemukan</span><h2>Tidak dapat terhubung ke database</h2><p>Periksa SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js.</p>`;
 } else {
-  loadParticipants();
+  loadEvents();
 }
 </script>
 </body>

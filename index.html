@@ -94,7 +94,7 @@
     <div class="mark">SM</div>
     <div>
       <div style="font-size:14px;font-weight:700;">Cek Pemahaman</div>
-      <small>Training Scrum Master — Efektif untuk Tim IT</small>
+      <small id="eventSubtitle">Training Scrum Master — Efektif untuk Tim IT</small>
     </div>
   </div>
   <div class="card" id="app">Memuat…</div>
@@ -121,6 +121,7 @@ try {
 
 let mode = "pre";
 let sessionId = null;
+let activeEvent = null; // {id, title, speaker, start_date, end_date}
 
 const QUESTIONS = [
   {cat:"Fondasi Agile", q:"Agile Manifesto lahir dari diskusi 17 praktisi software pada tahun berapa?",
@@ -221,14 +222,42 @@ function clearParticipantLocal(){
   try{ localStorage.removeItem(LOCAL_KEY); }catch(e){ /* abaikan */ }
 }
 
+function fmtDate(d){
+  if(!d) return "";
+  const dt = new Date(d + "T00:00:00");
+  return dt.toLocaleDateString("id-ID", {day:"numeric", month:"long", year:"numeric"});
+}
+
+async function loadActiveEvent(){
+  const { data, error } = await sb.from("events").select("*").eq("is_active", true)
+    .order("created_at", { ascending:false }).limit(1);
+  if(error || !data || !data.length){
+    activeEvent = null;
+    return;
+  }
+  activeEvent = data[0];
+  const sub = document.getElementById("eventSubtitle");
+  if(sub){
+    sub.textContent = `${activeEvent.title} — ${activeEvent.speaker}`;
+  }
+}
+
+function renderNoActiveEvent(){
+  app.innerHTML = `
+    <span class="badge">Belum Ada Event Aktif</span>
+    <h2>Training belum dibuka</h2>
+    <p>Saat ini belum ada event training yang diaktifkan oleh panitia. Hubungi admin/panitia training, atau coba buka link ini lagi nanti.</p>
+  `;
+}
+
 async function renderWelcomeBack(saved){
   app.innerHTML = `<h2>Memuat data kamu…</h2><p>Mohon tunggu sebentar.</p>`;
 
   nama = saved.nama; nik = saved.nik; divisi = saved.divisi;
 
   const [{ data: resultData }, { data: groupData }] = await Promise.all([
-    sb.from("results").select("mode,score,total").eq("nik", nik),
-    sb.from("groups").select("group_no").eq("nik", nik).limit(1)
+    sb.from("results").select("mode,score,total").eq("nik", nik).eq("event_id", activeEvent.id),
+    sb.from("groups").select("group_no").eq("nik", nik).eq("event_id", activeEvent.id).limit(1)
   ]);
 
   const preResult = (resultData||[]).find(r=>r.mode==="pre");
@@ -250,13 +279,13 @@ async function renderWelcomeBack(saved){
     mode = "post";
     actionHtml = `<button class="primary green" id="startBtn">Mulai Posttest</button>`;
   } else {
-    actionHtml = `<p style="text-align:center; margin-top:16px;">Kamu sudah menyelesaikan Pretest dan Posttest. Terima kasih!</p>`;
+    actionHtml = `<p style="text-align:center; margin-top:16px;">Kamu sudah menyelesaikan Pretest dan Posttest untuk event ini. Terima kasih!</p>`;
   }
 
   app.innerHTML = `
     <span class="badge">Selamat Datang Kembali</span>
     <h2>Halo, ${nama}!</h2>
-    <p>${divisi}${groupNo ? " · Kelompok " + groupNo : ""}</p>
+    <p>${divisi}${groupNo ? " · Kelompok " + groupNo : ""} · ${activeEvent.title}</p>
     <div class="summary-grid">
       ${statusBox("Pretest", preResult)}
       ${statusBox("Posttest", postResult)}
@@ -287,6 +316,7 @@ function renderStart(){
   app.innerHTML = `
     <span class="badge">${QUESTIONS.length} soal pilihan ganda</span>
     <h2>Cek Pemahaman Scrum</h2>
+    <p><b>${activeEvent.title}</b> — ${activeEvent.speaker}<br>${fmtDate(activeEvent.start_date)}${activeEvent.end_date && activeEvent.end_date!==activeEvent.start_date ? " – " + fmtDate(activeEvent.end_date) : ""}</p>
     <p>Isi data di bawah untuk mulai. Sistem otomatis mengarahkan ke Pretest atau Posttest sesuai riwayatmu.</p>
     <input type="text" id="namaInput" placeholder="Nama *" value="${nama}">
     <input type="text" id="nikInput" placeholder="NIK *" value="${nik}">
@@ -321,7 +351,7 @@ async function checkStatus(){
   const btn = document.getElementById("startBtn");
   btn.disabled = true; btn.textContent = "Memeriksa status…";
 
-  const { data, error } = await sb.from("results").select("mode").eq("nik", nik);
+  const { data, error } = await sb.from("results").select("mode").eq("nik", nik).eq("event_id", activeEvent.id);
 
   if(error){
     btn.disabled = false; btn.textContent = "Lanjutkan";
@@ -338,7 +368,7 @@ async function checkStatus(){
     app.innerHTML = `
       <span class="badge">Sudah Selesai</span>
       <h2>${nama}, kamu sudah menyelesaikan keduanya</h2>
-      <p>Pretest dan Posttest untuk NIK ${nik} sudah tercatat. Tidak perlu mengisi lagi. Terima kasih!</p>
+      <p>Pretest dan Posttest untuk NIK ${nik} pada event <b>${activeEvent.title}</b> sudah tercatat. Tidak perlu mengisi lagi. Terima kasih!</p>
       <button class="primary" id="backBtn0">Kembali</button>
     `;
     document.getElementById("backBtn0").addEventListener("click", initApp);
@@ -364,7 +394,7 @@ async function beginQuiz(){
   btn.disabled = true; btn.textContent = "Menyiapkan " + (mode==="pre"?"Pretest":"Posttest") + "…";
 
   const { data: sessionData, error: sessionError } = await sb.from("sessions")
-    .insert({ nik, nama, divisi, mode, status: "in_progress" })
+    .insert({ nik, nama, divisi, mode, status: "in_progress", event_id: activeEvent.id })
     .select("id")
     .single();
 
@@ -412,7 +442,7 @@ async function finishQuiz(){
   app.innerHTML = `<span class="badge">Menyimpan…</span><h2>Menyimpan hasilmu</h2><p>Mohon tunggu sebentar.</p>`;
 
   const { error } = await sb.from("results").insert({
-    nama, nik, divisi, mode, score, total: QUESTIONS.length, answers: correctFlags
+    nama, nik, divisi, mode, score, total: QUESTIONS.length, answers: correctFlags, event_id: activeEvent.id
   });
 
   if(sessionId){
@@ -422,7 +452,7 @@ async function finishQuiz(){
   if(error){
     const isDuplicate = error.code === "23505"; // unique_violation
     renderResult(score, false, isDuplicate
-      ? `NIK ${nik} ternyata sudah tercatat untuk ${mode==="pre"?"Pretest":"Posttest"} ini (kemungkinan submit ganda). Hasil TIDAK disimpan ulang.`
+      ? `NIK ${nik} ternyata sudah tercatat untuk ${mode==="pre"?"Pretest":"Posttest"} pada event ini (kemungkinan submit ganda). Hasil TIDAK disimpan ulang.`
       : "Gagal menyimpan hasil, coba lagi nanti.");
   } else {
     renderResult(score, true);
@@ -482,7 +512,13 @@ function renderReview(){
   document.getElementById("backBtn").addEventListener("click", initApp);
 }
 
-function initApp(){
+async function initApp(){
+  app.innerHTML = `<h2>Memuat…</h2>`;
+  await loadActiveEvent();
+  if(!activeEvent){
+    renderNoActiveEvent();
+    return;
+  }
   const saved = loadParticipantLocal();
   if(saved && saved.nik){
     renderWelcomeBack(saved);

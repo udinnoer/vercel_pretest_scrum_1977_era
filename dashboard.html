@@ -4,8 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — Pretest/Posttest Training Scrum Master</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script>
+if (localStorage.getItem("scrum_admin_auth") !== "1") {
+  location.href = "login.html?redirect=" + encodeURIComponent(location.pathname.split("/").pop() || "dashboard.html");
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --navy:#283990; --red:#E23633; --paper:#F6F5F2; --card:#FFFFFF;
@@ -35,6 +40,12 @@
     border-radius:999px; padding:3px 12px; margin-bottom:14px;
   }
   p{line-height:1.55; color:var(--ink-soft); font-size:15px;}
+  select{
+    padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--card); color:var(--ink); font-size:15px;
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  }
+  select:focus{outline:2px solid var(--navy); border-color:var(--navy);}
   button.primary{
     padding:12px 20px; border:none; border-radius:12px; background:var(--red);
     color:#fff; font-size:15px; font-weight:700; cursor:pointer;
@@ -79,12 +90,12 @@
 <div class="wrap">
   <div class="top">
     <div class="mark">SM</div>
-    <div>  
-      <div style="font-size:14px;font-weight:700;">Dashboard <span id="timer">Memuat...</span> <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kembali</a> <a href="admin.html" class="link-btn" style="margin-left:6px;font-size:12px;">Rekap</a> <a href="kelompok.html" class="link-btn" style="margin-left:6px;font-size:12px;">Kelompok</a></div>
+    <div>
+      <div style="font-size:14px;font-weight:700;">Dashboard <span id="timer"></span> <a href="index.html" class="link-btn" style="margin-left:10px;font-size:12px;">Kembali</a> <a href="admin.html" class="link-btn" style="margin-left:6px;font-size:12px;">Rekap</a> <a href="kelompok.html" class="link-btn" style="margin-left:6px;font-size:12px;">Kelompok</a> <a href="#" id="logoutLink" class="link-btn" style="margin-left:6px;font-size:12px;">Logout</a></div>
       <small>Training Scrum Master — Tim IT</small>
     </div>
   </div>
-  <div id="app"><div class="panel">Memuat data peserta dan progres...</div></div>
+  <div id="app"><div class="panel">Memuat daftar event...</div></div>
 </div>
 
 <script>
@@ -94,6 +105,19 @@ const sb = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL.indexOf("GANTI_D
 
 const app = document.getElementById("app");
 const timer = document.getElementById("timer");
+
+document.getElementById("logoutLink").addEventListener("click", (e)=>{
+  e.preventDefault();
+  localStorage.removeItem("scrum_admin_auth");
+  location.href = "login.html";
+});
+
+function fmtDate(d){
+  if(!d) return "";
+  const dt = new Date(d + "T00:00:00");
+  return dt.toLocaleDateString("id-ID", {day:"numeric", month:"short", year:"numeric"});
+}
+
 const QUESTIONS = [
   {cat:"Fondasi Agile", q:"Agile Manifesto lahir dari diskusi 17 praktisi software pada tahun berapa?"},
   {cat:"Fondasi Agile", q:"Manakah pernyataan berikut yang justru BERTENTANGAN dengan nilai inti Agile Manifesto?"},
@@ -102,26 +126,76 @@ const QUESTIONS = [
   {cat:"Mengenal Scrum", q:"Berikut ini termasuk nilai (values) Scrum, KECUALI:"},
   {cat:"Scrum Actors", q:"Siapa yang bertanggung jawab memaksimalkan nilai produk dan mengelola Product Backlog?"},
   {cat:"Scrum Actors", q:"Apa peran utama Scrum Master dalam tim?"},
+  {cat:"BRD & Product Backlog", q:"Dalam menyusun Business Requirement Document (BRD), kerangka apa yang dipakai untuk memastikan metric/KPI yang ditetapkan sudah tepat?"},
+  {cat:"BRD & Product Backlog", q:"Kerangka DEEP dipakai untuk menilai ciri Product Backlog yang baik. Apa kepanjangan dari DEEP?"},
+  {cat:"BRD & Product Backlog", q:"Manakah kriteria INVEST yang dipakai untuk menilai kualitas sebuah User Story?"},
   {cat:"Scrum Events", q:"Event yang dilakukan setiap hari, maksimal 15 menit, untuk sinkronisasi progress tim disebut?"},
   {cat:"Scrum Events", q:"Pada event apa tim mendemonstrasikan increment (hasil kerja) kepada stakeholder?"},
   {cat:"Scrum Events", q:"Apa tujuan utama Sprint Retrospective?"},
-  {cat:"Scrum Events", q:"Pada Sprint Planning, siapa yang menentukan BAGAIMANA (how) pekerjaan akan diselesaikan?"},
   {cat:"Waterfall & Scrum", q:"Pola \"Water-Scrum-Fall\" merujuk pada kondisi di mana?"},
-  {cat:"Bekal Praktik", q:"Dalam hierarki Product Backlog, hubungan yang benar adalah?"},
-  {cat:"Bekal Praktik", q:"Skala yang umum dipakai untuk Story Point saat Planning Poker adalah?"},
-  {cat:"Bekal Praktik", q:"Pada board retrospective ala EasyRetro, catatan di kolom \"To Improve\" dengan vote tertinggi biasanya diarahkan menjadi?"}
+  {cat:"Bekal Praktik", q:"Dalam hierarki Product Backlog, hubungan yang benar adalah?"}
 ];
 
+let events = [];
+let selectedEventId = null; // "__none__" | <uuid>
 let preScoreChart = null;
-let postScoreChart = null; 
+let postScoreChart = null;
+let refreshTimeoutId = null;
+
+async function loadEvents(){
+  const { data } = await sb.from("events").select("*").order("start_date", { ascending:false });
+  events = data || [];
+  renderEventPicker();
+}
+
+function renderEventPicker(){
+  if(refreshTimeoutId) clearTimeout(refreshTimeoutId);
+  timer.textContent = "";
+  const activeEvent = events.find(e=>e.is_active);
+  const options = `
+    ${events.map(ev=>`<option value="${ev.id}">${ev.title}${ev.is_active?" (Aktif)":""} — ${fmtDate(ev.start_date)}</option>`).join("")}
+    <option value="__none__">Data Tanpa Event (sebelum fitur event)</option>
+  `;
+  app.innerHTML = `
+    <div class="panel">
+      <span class="badge">Pilih Event</span>
+      <h2>Dashboard akan menampilkan data untuk event mana?</h2>
+      <p>${events.length ? "Pilih salah satu event di bawah, lalu klik Tampilkan." : "Belum ada event terdaftar — buat dulu di halaman Rekap Peserta."}</p>
+      ${events.length ? `
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+          <select id="eventPicker">${options}</select>
+          <button class="primary" id="showBtn">Tampilkan Dashboard</button>
+        </div>
+      ` : `<a href="admin.html" class="link-btn">Buka Halaman Rekap Peserta</a>`}
+    </div>
+  `;
+  if(events.length){
+    if(activeEvent){
+      document.getElementById("eventPicker").value = activeEvent.id;
+    }
+    document.getElementById("showBtn").addEventListener("click", ()=>{
+      selectedEventId = document.getElementById("eventPicker").value;
+      refreshData();
+    });
+  }
+}
 
 async function refreshData(){
-  const { data:sessions } = await sb  
-    .from("sessions")
-    .select("*");
-  const { data:results } = await sb
-    .from("results")
-    .select("*");
+  const selectedEvent = events.find(e=>e.id===selectedEventId);
+  const eventLabel = selectedEvent ? selectedEvent.title : "Data Tanpa Event";
+
+  let sessionsQuery = sb.from("sessions").select("*");
+  let resultsQuery = sb.from("results").select("*");
+  if(selectedEventId === "__none__"){
+    sessionsQuery = sessionsQuery.is("event_id", null);
+    resultsQuery = resultsQuery.is("event_id", null);
+  } else {
+    sessionsQuery = sessionsQuery.eq("event_id", selectedEventId);
+    resultsQuery = resultsQuery.eq("event_id", selectedEventId);
+  }
+
+  const { data:sessions } = await sessionsQuery;
+  const { data:results } = await resultsQuery;
 
   if(!sessions || !results){
     app.innerHTML = `<div class="panel">Gagal memuat data, coba muat ulang halaman ini.</div>`;
@@ -129,6 +203,10 @@ async function refreshData(){
   }
 
   app.innerHTML = `
+    <div class="panel" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div><span class="badge">Event</span><h2 style="margin:0;">${eventLabel}</h2></div>
+      <button class="ghost" id="changeEventBtn">Ganti Event</button>
+    </div>
     <div class="panel">
       <h2>Progress Peserta</h2>
       <div id="progress"></div>
@@ -144,26 +222,27 @@ async function refreshData(){
       </div>
     </div>
     <div class="panel">
-      <h2>Analisis Butir Soal</h2>  
+      <h2>Analisis Butir Soal</h2>
       <p>Persentase peserta yang menjawab benar tiap soal (Pretest vs Posttest)</p>
       <div id="soal"></div>
     </div>
   `;
+  document.getElementById("changeEventBtn").addEventListener("click", renderEventPicker);
 
-  // Jumlah progress  
+  // Jumlah progress
   const done = results.length;
   const progress = sessions.filter(s => s.status === "in_progress").length;
   const total = done + progress;
   document.getElementById("progress").innerHTML = `
     <div class="box">
       <h3>Selesai</h3>
-      <p>Sudah menyelesaikan Pretest & Posttest</p>  
+      <p>Sudah menyelesaikan Pretest & Posttest</p>
       <div class="val">${done}</div>
     </div>
     <div class="box">
       <h3>Sedang Mengerjakan</h3>
       <p>Sesi aktif yang belum submit</p>
-      <div class="val">${progress}</div>  
+      <div class="val">${progress}</div>
     </div>
     <div class="box">
       <h3>Total</h3>
@@ -172,7 +251,7 @@ async function refreshData(){
     </div>
   `;
 
-  // Chart skor 
+  // Chart skor
   const preScores = results.filter(r => r.mode === "pre").map(r => r.score);
   const postScores = results.filter(r => r.mode === "post").map(r => r.score);
 
@@ -182,7 +261,7 @@ async function refreshData(){
   preScoreChart = new Chart(document.getElementById("preScore"), {
     type: "bar",
     data: { labels: Array.from({length:QUESTIONS.length+1},(_,i)=>i), datasets: [
-      { data: preScores.reduce((acc,s)=> (acc[s]=(acc[s]||0)+1,acc), Array(QUESTIONS.length+1).fill(0)), 
+      { data: preScores.reduce((acc,s)=> (acc[s]=(acc[s]||0)+1,acc), Array(QUESTIONS.length+1).fill(0)),
         backgroundColor: "#1D4ED8" }
     ]},
     options: {
@@ -193,25 +272,25 @@ async function refreshData(){
   });
 
   postScoreChart = new Chart(document.getElementById("postScore"), {
-    type: "bar", 
+    type: "bar",
     data: { labels: Array.from({length:QUESTIONS.length+1},(_,i)=>i), datasets: [
       { data: postScores.reduce((acc,s)=> (acc[s]=(acc[s]||0)+1,acc), Array(QUESTIONS.length+1).fill(0)),
-        backgroundColor: "#1E8449" }  
+        backgroundColor: "#1E8449" }
     ]},
     options: {
       plugins: { legend: { display:false } },
-      scales: { x: { title: { display: true, text: "Skor" } },  
+      scales: { x: { title: { display: true, text: "Skor" } },
                 y: { title: { display: true, text: "Jumlah Peserta" }, ticks: { stepSize: 1 } } },
     }
   });
 
   const preN = results.filter(r => r.mode === "pre").length;
   const postN = results.filter(r => r.mode === "post").length;
-  const preAnswers = results.filter(r => r.mode === "pre").flatMap(r => r.answers);  
+  const preAnswers = results.filter(r => r.mode === "pre").flatMap(r => r.answers);
   const postAnswers = results.filter(r => r.mode === "post").flatMap(r => r.answers);
-  
+
   document.getElementById("soal").innerHTML = QUESTIONS.map((q,i) => {
-    const preCorrect = preAnswers.filter((a,j) => j%QUESTIONS.length === i).filter(Boolean).length;  
+    const preCorrect = preAnswers.filter((a,j) => j%QUESTIONS.length === i).filter(Boolean).length;
     const postCorrect = postAnswers.filter((a,j) => j%QUESTIONS.length === i).filter(Boolean).length;
     const prePct = preN > 0 ? (preCorrect / preN * 100).toFixed(0) : null;
     const postPct = postN > 0 ? (postCorrect / postN * 100).toFixed(0) : null;
@@ -220,9 +299,9 @@ async function refreshData(){
       <div>
         <h3>${q.cat} - Soal ${i+1}</h3>
         <div class="diff">
-          <div>Pretest<br><b>${prePct !== null ? prePct+"%" : "-"}</b></div>  
+          <div>Pretest<br><b>${prePct !== null ? prePct+"%" : "-"}</b></div>
           <div>Posttest<br><b>${postPct !== null ? postPct+"%" : "-"}</b></div>
-          <div class="${diff !== null ? (diff>0?"pos":diff<0?"neg":"") : ""}">${diff !== null ? (diff>0?"+":"")+diff+"%" : "-"}</div>  
+          <div class="${diff !== null ? (diff>0?"pos":diff<0?"neg":"") : ""}">${diff !== null ? (diff>0?"+":"")+diff+"%" : "-"}</div>
         </div>
       </div>
     `;
@@ -245,9 +324,9 @@ async function refreshData(){
 }
 
 if(!sb){
-  app.innerHTML = `<div class="panel">Tidak dapat terhubung ke database. Periksa SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js.</div>`;  
-} else {  
-  refreshData();
+  app.innerHTML = `<div class="panel">Tidak dapat terhubung ke database. Periksa SUPABASE_URL dan SUPABASE_ANON_KEY di file config.js.</div>`;
+} else {
+  loadEvents();
 }
 </script>
 </body>

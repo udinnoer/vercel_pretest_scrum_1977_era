@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login Admin — Training Scrum Master</title>
+<script src="config.js"></script>
+<style>
+  :root{
+    --navy:#283990; --red:#E23633; --paper:#F6F5F2; --card:#FFFFFF;
+    --ink:#1C1E2B; --ink-soft:#5B5F76; --line:#DEDCE8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#14162A; --card:#1D2040; --ink:#EEEFF7; --ink-soft:#A9ADC7; --line:#33365C; }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    min-height:100vh; display:flex; justify-content:center; padding:32px 16px 60px;
+  }
+  h1,h2{font-family:Cambria,Georgia,serif; margin:0 0 6px; font-weight:700;}
+  .wrap{width:100%; max-width:420px;}
+  .top{display:flex; align-items:center; gap:12px; margin-bottom:22px;}
+  .mark{
+    width:40px;height:40px;border-radius:50%; background:var(--navy); flex:none;
+    display:flex;align-items:center;justify-content:center; color:#fff;
+    font-family:Cambria,serif; font-weight:700; font-size:18px;
+  }
+  .top small{color:var(--ink-soft); font-size:13px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px 26px;}
+  .badge{
+    display:inline-block; font-size:12.5px; color:var(--red); border:1px solid var(--red);
+    border-radius:999px; padding:3px 12px; margin-bottom:14px;
+  }
+  p{line-height:1.55; color:var(--ink-soft); font-size:15px;}
+  input[type=password]{
+    width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+    background:transparent; color:var(--ink); font-size:15px; margin-bottom:14px;
+  }
+  input[type=password]:focus{outline:2px solid var(--navy); border-color:var(--navy);}
+  .save-note{font-size:13.5px; color:var(--ink-soft); margin:6px 0 14px;}
+  .save-note.err{color:var(--red);}
+  .save-note.ok{color:#2E8B57;}
+  button.primary{
+    width:100%; padding:14px; border:none; border-radius:12px; background:var(--red);
+    color:#fff; font-size:16px; font-weight:700; cursor:pointer;
+  }
+  button.primary:disabled{opacity:.4; cursor:not-allowed;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="mark">SM</div>
+    <div>
+      <div style="font-size:14px;font-weight:700;">Login Admin</div>
+      <small>Training Scrum Master — Tim IT</small>
+    </div>
+  </div>
+  <div class="card" id="app">
+    <span class="badge">Khusus Panitia/Admin</span>
+    <h2>Masuk ke Halaman Admin</h2>
+    <p>Halaman Rekap, Dashboard, dan Kelompok hanya bisa diakses setelah login.</p>
+    <input type="password" id="passInput" placeholder="Password admin *">
+    <div class="save-note err" id="loginError" style="display:none;"></div>
+    <button class="primary" id="loginBtn">Masuk</button>
+  </div>
+</div>
+
+<script>
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+const params = new URLSearchParams(location.search);
+const redirectTo = params.get("redirect") || "admin.html";
+
+const passInput = document.getElementById("passInput");
+const loginBtn = document.getElementById("loginBtn");
+const errEl = document.getElementById("loginError");
+
+loginBtn.addEventListener("click", doLogin);
+passInput.addEventListener("keydown", (e)=>{ if(e.key === "Enter") doLogin(); });
+passInput.focus();
+
+async function doLogin(){
+  errEl.style.display = "none";
+  if(typeof ADMIN_PASSWORD_HASH === "undefined"){
+    errEl.textContent = "ADMIN_PASSWORD_HASH belum diatur di config.js.";
+    errEl.style.display = "block";
+    return;
+  }
+  const val = passInput.value;
+  if(!val){
+    errEl.textContent = "Isi password terlebih dahulu.";
+    errEl.style.display = "block";
+    return;
+  }
+  loginBtn.disabled = true; loginBtn.textContent = "Memeriksa…";
+  const hash = await sha256Hex(val);
+  if(hash === ADMIN_PASSWORD_HASH){
+    try{ localStorage.setItem("scrum_admin_auth", "1"); }catch(e){ /* abaikan */ }
+    location.href = redirectTo;
+  } else {
+    loginBtn.disabled = false; loginBtn.textContent = "Masuk";
+    errEl.textContent = "Password salah, coba lagi.";
+    errEl.style.display = "block";
+    passInput.value = "";
+    passInput.focus();
+  }
+}
+</script>
+</body>
+</html>
